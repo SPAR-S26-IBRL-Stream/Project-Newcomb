@@ -30,6 +30,18 @@ To add a dependency: `uv add <package-name>`. This updates `pyproject.toml` and 
 
 **experiments/** is the exploration zone. Create a folder with your git handle. Each experiment gets its own subfolder with a README covering: what and why, design decisions, chat logs if vibe coded, results and interpretation, ideas for shared architecture evolution. PRs here get lighter review.
 
+## Running scripts
+
+Use `uv run` to execute scripts without manually activating the virtual environment:
+
+    uv run python experiments/yourname/script.py
+
+To launch a Jupyter notebook:
+
+    uv run jupyter lab
+
+`uv run` ensures the script uses the project's environment and has access to `ibrl/` and all dependencies.
+
 ## Imports
 
 `uv sync` installs `ibrl/` as a local package. From any script or notebook in `experiments/`, import normally:
