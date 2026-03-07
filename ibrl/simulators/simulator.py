@@ -29,8 +29,12 @@ def simulate(
     num_runs = options.get("num_runs", 1)
     verbose = options.get("verbose", 0)
 
+    num_actions = options.get("num_actions", 2)
+
     average_reward = np.zeros((2,num_steps)) # average reward, average (reward^2)
     optimal_reward = 0
+    all_probabilities = np.zeros((num_runs, num_steps, num_actions))
+    actions = np.zeros((num_runs, num_steps), dtype=int)
 
     for r in range(num_runs):
         env.reset()
@@ -44,13 +48,17 @@ def simulate(
             agent.update(probabilities, action, reward)
             average_reward[0,i] += reward
             average_reward[1,i] += reward**2
+            all_probabilities[r, i, :] = probabilities
+            actions[r, i] = action
 
     average_reward /= num_runs
     optimal_reward /= num_runs
 
     results = {
         "average_reward": average_reward,
-        "optimal_reward": optimal_reward
+        "optimal_reward": optimal_reward,
+        "probabilities": all_probabilities,
+        "actions": actions,
     }
 
     return results
