@@ -39,8 +39,8 @@ class BaseAgent(ABC):
         Update internal state based on outcome of the episode
 
         Arguments:
-            probabilities: The policy chosen by the agent
-            action:        The action selected from the policy
+            probabilities: The probability distribution over actions given by the agent
+            action:        The action that was selected from the probability distribution
             reward:        The reward received
         """
         self.step += 1

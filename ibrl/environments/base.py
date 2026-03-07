@@ -67,7 +67,7 @@ class BaseEnvironment(ABC):
         Compute the average reward obtained by the optimal policy
 
         Returns:
-            average reward of optimal policy
+            expected value of reward for optimal policy
         """
         pass
 

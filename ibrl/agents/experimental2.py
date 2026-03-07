@@ -13,18 +13,21 @@ class ExperimentalAgent2(BaseGreedyAgent):
     and are therefore able to update the correct entry of the reward matrix.
     Even with a strongly peaked distribution, we will sometimes not chose the most likely action. This allows us to
     access the off-diagonal entries. As this rarely happens, learning the off-diagonal rewards is relatively slow. To
-    speed up learning, we use sample averages, rather than Q-learning.
+    speed up learning, we prefer to use sample averages, rather than Q-learning.
 
     When exploiting, we compute the optimal distribution based on the current estimate of the reward matrix. This
     distribution may be non-deterministic.
+
+    Arguments:
+        learning_rate: Learning rate for Q-learning or None (or negative value) to use sample averages
     """
     def __init__(self, *args,
-            learning_rate : float = 0.1,
+            learning_rate : float | None = None,
             **kwargs):
         assert "temperature" not in kwargs or kwargs["temperature"] is None
         super().__init__(*args, **kwargs)
         assert self.num_actions == 2  # technical limitation for now
-        self.learning_rate = learning_rate
+        self.learning_rate = None if (isinstance(learning_rate,float) and learning_rate < 0) else learning_rate
         self.update_threshold = 0.9 # minimum probability to be considered for update
         self.exploration_peak = 20  # how strongly peaked should exploration policies be
 
@@ -57,11 +60,16 @@ class ExperimentalAgent2(BaseGreedyAgent):
         if probabilities[prediction] < self.update_threshold:
             return
         # updates are weighted by the corresponding probability
-        self.counts[prediction,action] += probabilities[prediction]
-        self.q[prediction,action] += probabilities[prediction] * (reward - self.q[prediction,action]) / self.counts[prediction,action]
-        #self.q[prediction,action] += probabilities[prediction] * self.learning_rate * (reward - self.q[prediction,action])
+        if self.learning_rate is None:
+            # sample average
+            self.counts[prediction,action] += probabilities[prediction]
+            self.q[prediction,action] += probabilities[prediction] * (reward - self.q[prediction,action]) / self.counts[prediction,action]
+        else:
+            # Q-learning
+            self.q[prediction,action] += probabilities[prediction] * self.learning_rate * (reward - self.q[prediction,action])
 
     def reset(self):
         super().reset()
-        self.counts = np.zeros((self.num_actions,self.num_actions))
+        if self.learning_rate is None:
+            self.counts = np.zeros((self.num_actions,self.num_actions))
         self.q = np.zeros((self.num_actions,self.num_actions))

@@ -2,15 +2,17 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def sample_action(rng : np.random.Generator, policy: NDArray[np.float64]) -> int:
+def sample_action(rng : np.random.Generator, probabilities: NDArray[np.float64]) -> int:
     """
-    Sample an action from a given policy
+    Sample an action from a given probability distribution
 
     Arguments:
-        policy: Probability distribution over actions
+        probabilities: Probability distribution over actions
 
     Returns:
         index of action
     """
-    policy /= policy.sum()  # for numerics
-    return rng.choice(len(policy), p=policy)
+    # the distribution should already be normalised, except for possible numerical errors
+    assert 0.99 < probabilities.sum() < 1.01
+    probabilities = probabilities / probabilities.sum()
+    return rng.choice(len(probabilities), p=probabilities)

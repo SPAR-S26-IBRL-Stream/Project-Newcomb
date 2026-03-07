@@ -48,7 +48,7 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
         seed_offset: Default offset, such that agent and environment can safely be initialised from same seed
 
     Returns:
-        constructed environment
+        constructed agent
     """
 
     agent_types = {
@@ -102,7 +102,7 @@ def construct_environment(string : str, options : dict[str,int], seed_offset : i
 
     name, kwargs = parse_argument_string(string)
     if name not in environment_types:
-        raise RuntimeError("Invalid environment: " + options.environment)
+        raise RuntimeError("Invalid environment: " + name)
 
     arguments = dict()
     arguments.update(options)

@@ -9,7 +9,7 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
     """
     Base class for Newcomb-like environments
 
-    The predictor samples an action from the agent's policy.
+    The predictor samples an action from the agent's probability distribution.
     For predicted action i and selected action j, the reward will be reward_table[i,j]
 
     Arguments:
