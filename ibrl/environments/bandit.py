@@ -15,7 +15,7 @@ class BanditEnvironment(BaseEnvironment):
     def interact(self, action : int) -> float:
         return self.random.normal(self.rewards[action], 1)
 
-    def get_optimal_reward(self) -> int:
+    def get_optimal_reward(self) -> float:
         return self.rewards.max()
 
     def reset(self):

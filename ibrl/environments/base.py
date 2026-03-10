@@ -51,7 +51,6 @@ class BaseEnvironment(ABC):
         Perform the interaction of the agent with the environment, based on the action chosen by the agent.
         The interaction is purely classical, i.e. it does not depend on the agent's policy. Potential policy-dependence
         arises when the predictor sets up the environment prior to the interaction.
-        hand
 
         Arguments:
             action: Action chosen by the agent
