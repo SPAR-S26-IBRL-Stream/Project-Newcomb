@@ -1,0 +1,26 @@
+class MatchEnv: #First environment : agent gets reward 1 if action matches observation, 0 if it doesn't
+    # Fair coin
+    def prob_obs(self, obs): #Obs short for observation
+        return 0.5
+
+    # reward 1 if match, else 0
+    def reward(self, obs, action):
+        if obs == action:
+            return 1.0
+        if obs != action:
+            return 0.0
+
+class ReverseTailsEnv: #Second environment : If HEADS : agent gets reward if mismatch, 0 if match. If TAILS : agents always gets 0.5, regardless if match or not. 
+    # Fair coin
+    def prob_obs(self, obs):
+        return 0.5
+
+    # Heads: mismatch gives 1, match gives 0
+    # If Tails: always 0.5
+    def reward(self, obs, action):
+        if obs == "H":
+            if action != obs:
+                return 1.0
+            return 0.0
+        if obs == "T":
+            return 0.5
