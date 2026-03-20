@@ -2,6 +2,8 @@ from abc import ABC,abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 
+from ..outcome import Outcome
+
 
 class BaseEnvironment(ABC):
     """
@@ -34,31 +36,34 @@ class BaseEnvironment(ABC):
         self.seed = seed
         self.verbose = verbose
 
-    def predict(self, probabilities : NDArray[np.float64]) -> None:
-        """
-        Let the predictor set up the environment. The predictor has access to the probability distribution from which
-        the agent samples its actions, but not the action itself. The predictor may adjust rewards or otherwise modify
-        the environment based on this distribution.
+    def step(self, probabilities : NDArray[np.float64], action : int) -> Outcome:
+        """Execute one round of interaction.
+
+        The environment first responds to the agent's policy (e.g. the predictor
+        samples a prediction), then resolves the payoff given the agent's action.
 
         Arguments:
-            probabilities: Probability distribution for actions by the agent
+            probabilities: The agent's policy (probability distribution over actions)
+            action:        The action sampled from the policy
+
+        Returns:
+            Outcome containing the reward and any environment action
         """
-        pass
+        env_action = self._respond(probabilities)
+        reward = self._resolve(env_action, action)
+        return Outcome(reward=reward, env_action=env_action)
+
+    def _respond(self, probabilities : NDArray[np.float64]) -> int | None:
+        """Environment's move given the agent's policy. Override in subclasses.
+
+        For Newcomb-like environments, this is where the predictor samples its
+        prediction. For standard bandits, returns None.
+        """
+        return None
 
     @abstractmethod
-    def interact(self, action : int) -> float:
-        """
-        Perform the interaction of the agent with the environment, based on the action chosen by the agent.
-        The interaction is purely classical, i.e. it does not depend on the agent's policy. Potential policy-dependence
-        arises when the predictor sets up the environment prior to the interaction.
-        hand
-
-        Arguments:
-            action: Action chosen by the agent
-        
-        Returns:
-            reward of the interaction
-        """
+    def _resolve(self, env_action : int | None, action : int) -> float:
+        """Determine the reward given both moves. Override in subclasses."""
         pass
 
     @abstractmethod

@@ -12,7 +12,7 @@ class BanditEnvironment(BaseEnvironment):
     according to a normal distribution centred on the average value.
     Upon initialisation, the average rewards are sampled from a standard normal distribution.
     """
-    def interact(self, action : int) -> float:
+    def _resolve(self, env_action : int | None, action : int) -> float:
         return self.random.normal(self.rewards[action], 1)
 
     def get_optimal_reward(self) -> int:

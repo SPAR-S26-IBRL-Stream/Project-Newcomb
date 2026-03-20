@@ -36,8 +36,8 @@ class ExperimentalAgent3(QLearningAgent):
         probabilities[1] = 1 - probabilities[0]
         return probabilities
 
-    def update(self, probabilities : NDArray[np.float64], action : int, reward : float):
-        super().update(None, self.proto_action, reward)
+    def update(self, probabilities, action, outcome):
+        super().update(None, self.proto_action, outcome)
 
     def dump_state(self):
         return super().dump_state()+f",{self.proto_action}"
