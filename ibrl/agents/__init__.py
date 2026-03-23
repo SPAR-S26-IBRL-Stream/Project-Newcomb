@@ -8,6 +8,7 @@ from .experimental2 import ExperimentalAgent2
 from .experimental3 import ExperimentalAgent3
 from .ucb import UCBAgent
 from .iucb import IUCBAgent
+from .matrix_ucb import MatrixUCBAgent
 
 __all__ = [
     "BaseAgent",
@@ -20,4 +21,5 @@ __all__ = [
     "ExperimentalAgent3",
     "UCBAgent",
     "IUCBAgent",
+    "MatrixUCBAgent",
 ]
