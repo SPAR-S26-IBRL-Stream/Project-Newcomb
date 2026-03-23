@@ -29,7 +29,7 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
     def _resolve(self, env_action : int, action : int) -> float:
         return self.reward_table[env_action, action]
 
-    def get_optimal_reward(self) -> int:
+    def get_optimal_reward(self) -> float:
         # Compute the optimal reward, based on the full reward table
         # The reward is a quadratic function of the probability of taking action 0.
         # Thus, there are three policies that could potentially be optimal

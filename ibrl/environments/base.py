@@ -65,6 +65,20 @@ class BaseEnvironment(ABC):
     def _resolve(self, env_action : int | None, action : int) -> float:
         """Determine the reward given both moves. Override in subclasses."""
         pass
+    
+    def interact(self, action : int) -> float:
+        """
+        Perform the interaction of the agent with the environment, based on the action chosen by the agent.
+        The interaction is purely classical, i.e. it does not depend on the agent's policy. Potential policy-dependence
+        arises when the predictor sets up the environment prior to the interaction.
+
+        Arguments:
+            action: Action chosen by the agent
+        
+        Returns:
+            reward of the interaction
+        """
+        pass
 
     @abstractmethod
     def get_optimal_reward(self) -> float:

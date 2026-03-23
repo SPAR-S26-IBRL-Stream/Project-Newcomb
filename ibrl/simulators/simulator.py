@@ -16,9 +16,10 @@ def simulate(
         env:     the environment
         agent:   the agent
         options: optional dictionary of further options, namely
-            num_steps: Number of steps to simulate in each run
-            num_runs:  Number of runs
-            verbose:   Request debugging output
+            num_steps:   Number of steps to simulate in each run
+            num_runs:    Number of runs
+            num_actions: Number of actions
+            verbose:     Request debugging output
 
     Returns:
         A dictionary containing summary information, namely
@@ -41,7 +42,7 @@ def simulate(
 
     for run in range(num_runs):
         if verbose > 0:
-            print("Run:", run)
+            print(f"Run: {run}")
         env.reset()
         agent.reset()
         optimal_reward += env.get_optimal_reward()

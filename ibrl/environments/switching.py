@@ -29,7 +29,7 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
 
         return self.random.normal(self.values[action], 0.1)
 
-    def get_optimal_reward(self) -> int:
+    def get_optimal_reward(self) -> float:
         return 1.0 # The maximum reward is always 1.0
 
     def reset(self):
