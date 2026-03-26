@@ -27,7 +27,7 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
             self.values = np.zeros((self.num_actions,))
             self.values[-1] = 1.0 # Move reward to the last arm
 
-        return float(self.random.random() < self.values[action])
+        return self.random.normal(self.values[action], 0.1)
 
     def get_optimal_reward(self) -> float:
         return 1.0 # The maximum reward is always 1.0
