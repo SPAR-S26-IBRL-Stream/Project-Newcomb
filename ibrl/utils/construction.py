@@ -1,6 +1,6 @@
 from .. import agents
 from .. import environments
-from ..infrabayesian.beliefs import BernoulliBelief, NewcombLikeBelief
+from ..infrabayesian.beliefs import BernoulliBelief, GaussianBelief, NewcombLikeBelief
 
 
 def parse_argument_string(string : str) -> tuple[str, dict[str, float]]:
@@ -67,6 +67,7 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
 
     belief_types = {
         "bernoulli": lambda num_actions, **kw: BernoulliBelief(num_actions),
+        "gaussian":  lambda num_actions, **kw: GaussianBelief(num_actions),
         "newcomb":   lambda num_actions, **kw: NewcombLikeBelief(num_actions),
     }
 
