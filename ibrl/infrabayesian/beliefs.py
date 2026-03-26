@@ -63,6 +63,38 @@ class BanditBelief(BaseBelief):
         return c
 
 
+class GaussianBelief(BaseBelief):
+    """Belief using Gaussian precision-weighted updates per arm.
+
+    Identical update math to BayesianAgent: tracks a mean and precision
+    per arm, updates via precision-weighted averaging. This means
+    InfraBayesianAgent(belief=GaussianBelief(n)) should produce identical
+    behavior to BayesianAgent on bandit environments.
+    """
+
+    def __init__(self, num_actions: int):
+        self.num_actions = num_actions
+        self.values = np.zeros(num_actions)
+        self.precision = np.ones(num_actions) * 0.1
+
+    def update(self, action: int, outcome: Outcome, context: dict | None = None):
+        r = outcome.reward
+        self.values[action] = (
+            self.precision[action] * self.values[action] + r
+        ) / (self.precision[action] + 1.0)
+        self.precision[action] += 1
+
+    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
+        return self.values.copy()
+
+    def copy(self) -> "GaussianBelief":
+        c = GaussianBelief.__new__(GaussianBelief)
+        c.num_actions = self.num_actions
+        c.values = self.values.copy()
+        c.precision = self.precision.copy()
+        return c
+
+
 class NewcombLikeBelief(BaseBelief):
     """Belief for deterministic reward matrices.
 

@@ -4,7 +4,7 @@ import pytest
 
 from ibrl.outcome import Outcome
 from ibrl.infrabayesian.beliefs import (
-    BaseBelief, BanditBelief, NewcombLikeBelief, SwitchingBelief,
+    BaseBelief, BanditBelief, GaussianBelief, NewcombLikeBelief, SwitchingBelief,
 )
 from ibrl.infrabayesian.belief_a_measure import BeliefAMeasure
 from ibrl.infrabayesian.belief_infradistribution import BeliefInfradistribution
@@ -211,6 +211,41 @@ class TestNewcombLikeEquivalence:
             direct_model = belief.expected_reward_model()
             agent_model = agent.infradist.expected_reward_model()
             np.testing.assert_allclose(agent_model, direct_model, atol=1e-12)
+
+
+# ── GaussianBelief ↔ BayesianAgent equivalence ───────────────────────────────
+
+class TestGaussianBeliefMatchesBayesianAgent:
+    """IB agent with GaussianBelief should produce identical rewards to BayesianAgent
+    on the same bandit environment with the same seed and epsilon."""
+
+    def test_identical_rewards_on_bandit(self):
+        from ibrl.agents import BayesianAgent
+
+        seed = 42
+        n = 3
+        env_seed = 99
+        opts = {"num_steps": 100, "num_runs": 5}
+
+        env = BanditEnvironment(num_actions=n, seed=env_seed)
+        bayesian = BayesianAgent(num_actions=n, seed=seed, epsilon=0.1)
+        r_bay = simulate(env, bayesian, opts)
+
+        env = BanditEnvironment(num_actions=n, seed=env_seed)
+        ib = InfraBayesianAgent(
+            num_actions=n, seed=seed,
+            belief=GaussianBelief(num_actions=n), epsilon=0.1,
+        )
+        r_ib = simulate(env, ib, opts)
+
+        np.testing.assert_array_equal(
+            r_bay["rewards"], r_ib["rewards"],
+            err_msg="IB+GaussianBelief should produce identical rewards to BayesianAgent",
+        )
+        np.testing.assert_array_equal(
+            r_bay["actions"], r_ib["actions"],
+            err_msg="IB+GaussianBelief should produce identical actions to BayesianAgent",
+        )
 
 
 # ── Simulator integration ───────────────────────────────────────────────────
