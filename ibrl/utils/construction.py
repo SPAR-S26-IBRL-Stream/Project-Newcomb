@@ -82,12 +82,17 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
     arguments.pop("num_runs", None)
     arguments["seed"] += seed_offset
 
-    # For infrabayesian agent, construct belief from string kwarg
-    if name == "infrabayesian" and "belief" in arguments:
-        belief_name = arguments.pop("belief")
-        if belief_name not in belief_types:
-            raise RuntimeError("Invalid belief type: " + str(belief_name))
-        arguments["belief"] = belief_types[belief_name](num_actions=arguments["num_actions"])
+    # For infrabayesian agent, construct beliefs and optional utility from string kwargs
+    if name == "infrabayesian":
+        num_act = arguments["num_actions"]
+        if "belief" in arguments:
+            # Single belief shorthand: belief=bernoulli -> beliefs=[BernoulliBelief(...)]
+            belief_name = arguments.pop("belief")
+            if belief_name not in belief_types:
+                raise RuntimeError("Invalid belief type: " + str(belief_name))
+            arguments["beliefs"] = [belief_types[belief_name](num_actions=num_act)]
+        elif "beliefs" not in arguments:
+            raise RuntimeError("infrabayesian agent requires belief= or beliefs= argument")
 
     return agent_types[name](**arguments)
 

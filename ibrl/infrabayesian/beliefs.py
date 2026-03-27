@@ -31,6 +31,17 @@ class BaseBelief(ABC):
         pass
 
     @abstractmethod
+    def observation_probability(self, action: int, outcome: Outcome) -> float:
+        """P(this observation) under the current belief.
+
+        Must be called BEFORE update(), since update() changes the
+        sufficient statistics that this method reads.
+
+        Returns a probability in [0, 1].
+        """
+        pass
+
+    @abstractmethod
     def copy(self) -> "BaseBelief":
         """Return an independent copy."""
         pass
@@ -56,6 +67,13 @@ class BernoulliBelief(BaseBelief):
 
     def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
         return self.alpha / (self.alpha + self.beta)
+
+    def observation_probability(self, action: int, outcome: Outcome) -> float:
+        r = outcome.reward
+        if not (0.0 <= r <= 1.0):
+            raise ValueError(f"BernoulliBelief expects reward in [0, 1], got {r}")
+        p = self.alpha[action] / (self.alpha[action] + self.beta[action])
+        return p ** r * (1 - p) ** (1 - r)
 
     def copy(self) -> "BernoulliBelief":
         c = BernoulliBelief.__new__(BernoulliBelief)
@@ -89,6 +107,20 @@ class GaussianBelief(BaseBelief):
     def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
         return self.values.copy()
 
+    def observation_probability(self, action: int, outcome: Outcome) -> float:
+        """Not yet implemented — required for KU but not for non-KU (single belief).
+
+        Needs an assumed observation noise variance (sigma^2) to compute
+        P(reward | action) = Normal(reward; values[action], sigma^2).
+        Currently GaussianBelief only tracks the mean estimate's precision,
+        not observation noise. Simplest path: add a fixed noise_var constructor
+        parameter. Could also be estimated from data.
+        """
+        raise NotImplementedError(
+            "GaussianBelief.observation_probability requires assumed "
+            "noise variance — see docstring for details"
+        )
+
     def copy(self) -> "GaussianBelief":
         c = GaussianBelief.__new__(GaussianBelief)
         c.num_actions = self.num_actions
@@ -115,6 +147,12 @@ class NewcombLikeBelief(BaseBelief):
         model = self.observed.copy()
         model[np.isnan(model)] = self.prior_mean
         return model
+
+    def observation_probability(self, action: int, outcome: Outcome) -> float:
+        expected = self.observed[outcome.env_action, action]
+        if np.isnan(expected):
+            return 1.0  # unobserved cell — any outcome is "expected"
+        return 1.0 if outcome.reward == expected else 0.0
 
     def copy(self) -> "NewcombLikeBelief":
         c = NewcombLikeBelief.__new__(NewcombLikeBelief)

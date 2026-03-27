@@ -6,14 +6,16 @@ from . import BaseGreedyAgent
 from ..infrabayesian.beliefs import BaseBelief
 from ..infrabayesian.belief_a_measure import BeliefAMeasure
 from ..infrabayesian.belief_infradistribution import BeliefInfradistribution
+from ..outcome import Outcome
 from ..utils import dump_array
 
 
 class InfraBayesianAgent(BaseGreedyAgent):
     """Agent using infrabayesian inference.
 
-    Initialized with a BELIEF (epistemic model), not an environment.
-    Wraps the belief in AMeasure/Infradistribution.
+    Initialized with beliefs (list of epistemic models), not an environment.
+    A single-element list gives non-KU (standard Bayesian) behavior;
+    multiple elements give Knightian uncertainty.
 
     get_probabilities() has two phases:
       1. MODEL: ask infradist for the expected reward structure
@@ -26,22 +28,39 @@ class InfraBayesianAgent(BaseGreedyAgent):
     Other agents are unaffected.
     """
 
-    def __init__(self, *args, belief: BaseBelief, **kwargs):
+    def __init__(self, *args, beliefs: list[BaseBelief],
+                 g: float = 1.0, utility=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._belief_template = belief
+        if not isinstance(beliefs, list) or len(beliefs) == 0:
+            raise ValueError("beliefs must be a non-empty list of BaseBelief")
+        self._belief_templates = beliefs
+        self._g = g
+        self._utility = utility
 
     def reset(self):
         super().reset()
-        belief = self._belief_template.copy()
-        self.infradist = BeliefInfradistribution([
-            BeliefAMeasure(belief)  # single measure, lambda=1, b=0
-        ])
+        measures = [BeliefAMeasure(b.copy()) for b in self._belief_templates]
+        self.infradist = BeliefInfradistribution(measures, g=self._g)
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
         """MODEL phase: update beliefs with observation."""
         context = {'step': self.step, 'policy': probabilities}
-        super().update(probabilities, action, outcome)
-        self.infradist.update(action, outcome, context)
+        super().update(probabilities, action, outcome)  # base agent sees raw reward
+
+        if self._utility is not None:
+            # Map reward to utility before passing to infradistribution
+            mapped_reward = self._utility(outcome.reward)
+            if not (0.0 <= mapped_reward <= 1.0):
+                raise ValueError(
+                    f"Utility mapping must produce values in [0, 1], "
+                    f"got {mapped_reward} from reward {outcome.reward}")
+            mapped_outcome = Outcome(
+                reward=mapped_reward,
+                env_action=outcome.env_action if hasattr(outcome, 'env_action') else None,
+            )
+            self.infradist.update(action, mapped_outcome, context)
+        else:
+            self.infradist.update(action, outcome, context)
 
     def get_probabilities(self) -> NDArray[np.float64]:
         """MODEL then PLAN: get reward structure, solve for policy."""

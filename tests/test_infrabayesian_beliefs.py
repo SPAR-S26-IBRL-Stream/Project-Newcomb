@@ -133,7 +133,7 @@ class TestBanditEquivalence:
 
     def test_ib_pipe_matches_direct_belief(self):
         belief = BernoulliBelief(num_actions=3)
-        agent = InfraBayesianAgent(num_actions=3, belief=BernoulliBelief(num_actions=3), epsilon=0.1)
+        agent = InfraBayesianAgent(num_actions=3, beliefs=[BernoulliBelief(num_actions=3)], epsilon=0.1)
         agent.reset()
 
         # Feed same observations to both
@@ -163,7 +163,7 @@ class TestNewcombLikeEquivalence:
     def test_ib_pipe_matches_direct_belief(self):
         belief = NewcombLikeBelief(num_actions=2)
         agent = InfraBayesianAgent(
-            num_actions=2, belief=NewcombLikeBelief(num_actions=2), epsilon=0.1
+            num_actions=2, beliefs=[NewcombLikeBelief(num_actions=2)], epsilon=0.1
         )
         agent.reset()
 
@@ -206,7 +206,7 @@ class TestGaussianBeliefMatchesBayesianAgent:
         env = BanditEnvironment(num_actions=n, seed=env_seed)
         ib = InfraBayesianAgent(
             num_actions=n, seed=seed,
-            belief=GaussianBelief(num_actions=n), epsilon=0.1,
+            beliefs=[GaussianBelief(num_actions=n)], epsilon=0.1,
         )
         r_ib = simulate(env, ib, opts)
 
@@ -227,7 +227,7 @@ class TestSimulatorIntegration:
         """IB agent on bandit: average reward should increase over time."""
         env = BernoulliBanditEnvironment(num_actions=3, seed=42)
         agent = InfraBayesianAgent(
-            num_actions=3, belief=BernoulliBelief(num_actions=3),
+            num_actions=3, beliefs=[BernoulliBelief(num_actions=3)],
             epsilon=(0.5, 0.5, 0.01), seed=123,
         )
         results = simulate(env, agent, {"num_steps": 200, "num_runs": 5})
@@ -242,7 +242,7 @@ class TestSimulatorIntegration:
         """IB agent on Newcomb: should complete without errors."""
         env = NewcombEnvironment(num_actions=2, seed=42)
         agent = InfraBayesianAgent(
-            num_actions=2, belief=NewcombLikeBelief(num_actions=2),
+            num_actions=2, beliefs=[NewcombLikeBelief(num_actions=2)],
             epsilon=0.1, seed=123,
         )
         results = simulate(env, agent, {"num_steps": 50, "num_runs": 2})
