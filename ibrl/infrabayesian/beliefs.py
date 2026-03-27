@@ -49,7 +49,8 @@ class BernoulliBelief(BaseBelief):
         self.beta = np.ones(num_actions)    # Beta prior beta=1
 
     def update(self, action: int, outcome: Outcome, context: dict | None = None):
-        assert 0.0 <= outcome.reward <= 1.0, f"BernoulliBelief expects reward in [0, 1], got {outcome.reward}"
+        if (outcome.reward < 0) or (outcome.reward > 1):
+            raise ValueError(f"BernoulliBelief expects reward in [0, 1], got {outcome.reward}")
         self.alpha[action] += outcome.reward
         self.beta[action] += 1.0 - outcome.reward
 

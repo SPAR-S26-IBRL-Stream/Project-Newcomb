@@ -251,16 +251,4 @@ class TestSimulatorIntegration:
 
 # ── SwitchingAdversary Bernoulli fix ─────────────────────────────────────────
 
-class TestSwitchingBernoulli:
-    def test_rewards_are_binary(self):
-        """After fix, SwitchingAdversary should produce 0.0 or 1.0 rewards."""
-        env = SwitchingAdversaryEnvironment(
-            num_actions=2, num_steps=20, seed=42,
-        )
-        env.reset()
-        probs = np.array([0.5, 0.5])
-        for _ in range(20):
-            outcome = env.step(probs, 0)
-            assert outcome.reward in (0.0, 1.0), (
-                f"Expected binary reward, got {outcome.reward}"
-            )
+

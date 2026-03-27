@@ -30,7 +30,10 @@ def parse_argument_string(string : str) -> tuple[str, dict[str, float]]:
     for arg in args_str.split(","):
         arg_name,arg_val = arg.split("=",1)
         if ":" not in arg_val:
-            args_dict[arg_name] = float(arg_val)
+            try:
+                args_dict[arg_name] = float(arg_val)
+            except ValueError:
+                args_dict[arg_name] = arg_val
         else:
             args_dict[arg_name] = tuple(map(float, arg_val.split(":")))
     return name, args_dict
@@ -82,8 +85,6 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
     # For infrabayesian agent, construct belief from string kwarg
     if name == "infrabayesian" and "belief" in arguments:
         belief_name = arguments.pop("belief")
-        if isinstance(belief_name, float):
-            belief_name = str(int(belief_name))  # parse_argument_string returns floats
         if belief_name not in belief_types:
             raise RuntimeError("Invalid belief type: " + str(belief_name))
         arguments["belief"] = belief_types[belief_name](num_actions=arguments["num_actions"])

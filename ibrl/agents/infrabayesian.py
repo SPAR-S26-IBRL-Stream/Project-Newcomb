@@ -26,7 +26,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
     Other agents are unaffected.
     """
 
-    def __init__(self, *args, belief: BaseBelief = None, **kwargs):
+    def __init__(self, *args, belief: BaseBelief, **kwargs):
         super().__init__(*args, **kwargs)
         self._belief_template = belief
 
