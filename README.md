@@ -112,12 +112,14 @@ Use infra: for non-code changes like README, CI, pyproject.toml and repo config.
 
 ## Fork update:
 
-Minimal & focused - Only tests core agents/environments, skips experimental code
+Minimal & focused - Only tests core agents/environments, mostly skips experimental code
+
 Fast smoke test - 10-second validation catches obvious breakage
+
 Structured fixtures - Reusable test setup
+
 CI/CD ready - GitHub Actions workflow for PR validation
-Coverage tracking - Optional coverage reports
-Timeout protection - Prevents hanging tests
+
 
 ## Test manual
 
