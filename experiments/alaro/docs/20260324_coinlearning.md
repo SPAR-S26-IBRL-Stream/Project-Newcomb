@@ -444,13 +444,13 @@ class SwitchingBelief(BaseBelief):
 
 Enumerates over T switch times only. O(T×K) per step.
 
-### 6.3 `BeliefAMeasure`
+### 6.3 `AMeasure`
 
 Wraps a belief with the (λ, b) structure needed for IB. In non-KU mode,
 λ=1 and b=0, making this a pure pass-through.
 
 ```python
-class BeliefAMeasure:
+class AMeasure:
     def __init__(self, belief, log_scale=0.0, offset=0.0):
         self.belief = belief
         self.log_scale = log_scale  # log(λ)
@@ -470,7 +470,7 @@ class BeliefAMeasure:
 ```python
 class Infradistribution:
     def __init__(self, measures):
-        self.measures = measures  # list of BeliefAMeasure
+        self.measures = measures  # list of AMeasure
 
     def update(self, action, outcome, context=None):
         for m in self.measures:
@@ -519,7 +519,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
         super().reset()
         belief = self._belief_template.copy()
         self.infradist = Infradistribution([
-            BeliefAMeasure(belief)  # single measure, λ=1, b=0
+            AMeasure(belief)  # single measure, λ=1, b=0
         ])
 
     def update(self, probabilities, action, outcome):
@@ -667,7 +667,7 @@ depends on the reward function.
 
 ### Changes to `Infradistribution`
 
-- Constructor accepts multiple `BeliefAMeasure` objects (credal set vertices),
+- Constructor accepts multiple `AMeasure` objects (credal set vertices),
   each with its own independent belief copy and (λ, b)
 - `expected_reward_model()` already returns element-wise min — with multiple
   measures this gives the pessimistic (worst-case) model
@@ -693,7 +693,7 @@ depends on the reward function.
 ### Agent changes
 
 - `InfraBayesianAgent` gains `knightian=True/False` flag
-- When `knightian=True`, `reset()` creates multiple `BeliefAMeasure` objects,
+- When `knightian=True`, `reset()` creates multiple `AMeasure` objects,
   each wrapping an independent `belief.copy()`
 - Planning step receives pessimistic reward model (element-wise min) and
   solves for policy accordingly — may need maximin rather than greedy
@@ -715,7 +715,7 @@ depends on the reward function.
 | File | Commit | Contents |
 |------|--------|----------|
 | `ibrl/infrabayesian/__init__.py` | 1 | Public exports |
-| `ibrl/infrabayesian/a_measure.py` | 1 | `AMeasure` (explicit history); `BeliefAMeasure` added in commit 3 |
+| `ibrl/infrabayesian/a_measure.py` | 1 | `AMeasure` (explicit history); `AMeasure` added in commit 3 |
 | `ibrl/infrabayesian/infradistribution.py` | 1 | `Infradistribution` class |
 | `ibrl/infrabayesian/helpers.py` | 1 | `match()`, `glue()`, reward functions |
 | `ibrl/infrabayesian/beliefs.py` | 3 | `BaseBelief`, `BanditBelief`, `NewcombLikeBelief`, `SwitchingBelief` |
@@ -728,7 +728,7 @@ depends on the reward function.
 |------|--------|--------|
 | `ibrl/infrabayesian/a_measure.py` | 2 | Add `is_valid()` |
 | `ibrl/infrabayesian/infradistribution.py` | 2 | Fix offset bug, add normalization warning |
-| `ibrl/infrabayesian/a_measure.py` | 3 | Add `BeliefAMeasure` |
+| `ibrl/infrabayesian/a_measure.py` | 3 | Add `AMeasure` |
 | `ibrl/infrabayesian/infradistribution.py` | 3 | Add belief-based `update()` and `expected_reward_model()` |
 | `ibrl/environments/switching.py` | 3 | Change `_resolve` from Gaussian to Bernoulli |
 | `ibrl/agents/__init__.py` | 3 | Add `InfraBayesianAgent` |
@@ -766,8 +766,8 @@ depends on the reward function.
 │     │                                 │                                   │  │
 │     │                                 │  ┌─────────────────────────────┐  │  │
 │     │                                 │  │     Infradistribution      │  │  │
-│     │                                 │  │  Non-KU: 1 BeliefAMeasure  │  │  │
-│     │                                 │  │  KU:     N BeliefAMeasures │  │  │
+│     │                                 │  │  Non-KU: 1 AMeasure  │  │  │
+│     │                                 │  │  KU:     N AMeasures │  │  │
 │     │                                 │  │                             │  │  │
 │     │                                 │  │  update(action, out, ctx)   │  │  │
 │     │                                 │  │  expected_reward_model(ctx) │  │  │
@@ -775,7 +775,7 @@ depends on the reward function.
 │     │                                 │  │    KU: element-wise min     │  │  │
 │     │                                 │  │                             │  │  │
 │     │                                 │  │  ┌───────────────────────┐ │  │  │
-│     │                                 │  │  │  BeliefAMeasure       │ │  │  │
+│     │                                 │  │  │  AMeasure       │ │  │  │
 │     │                                 │  │  │  (λ, b, belief)       │ │  │  │
 │     │                                 │  │  │  λ*model + b          │ │  │  │
 │     │                                 │  │  │                       │ │  │  │
@@ -811,7 +811,7 @@ Data flow (one step, non-KU):
     ─────────                                         ─────
     1. calls agent.get_probabilities()
                                               MODEL: infradist.expected_reward_model()
-                                                     -> BeliefAMeasure.expected_reward_model()
+                                                     -> AMeasure.expected_reward_model()
                                                         -> belief.expected_reward_model()
                                                            returns reward vector/matrix
                                               PLAN:  if 1D: build_greedy_policy(values)
@@ -822,7 +822,7 @@ Data flow (one step, non-KU):
     3. calls env.step(π, action) -> Outcome
     4. calls agent.update(π, action, outcome)
                                               MODEL: infradist.update(action, outcome, ctx)
-                                                     -> BeliefAMeasure.update(...)
+                                                     -> AMeasure.update(...)
                                                         -> belief.update(action, outcome, ctx)
                                                            updates sufficient stats
 ```

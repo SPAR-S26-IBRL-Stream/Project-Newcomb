@@ -1,4 +1,4 @@
-"""BeliefAMeasure — wraps a belief with (lambda, b) a-measure structure."""
+"""AMeasure — wraps a belief with (lambda, b) a-measure structure."""
 import numpy as np
 from numpy.typing import NDArray
 
@@ -6,7 +6,7 @@ from ..outcome import Outcome
 from .beliefs import BaseBelief
 
 
-class BeliefAMeasure:
+class AMeasure:
     """Wraps a belief with the (lambda, b) structure needed for IB.
 
     In non-KU mode, lambda=1 and b=0, making this a pure pass-through.

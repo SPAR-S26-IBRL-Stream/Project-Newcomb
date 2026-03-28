@@ -4,8 +4,8 @@ from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..infrabayesian.beliefs import BaseBelief
-from ..infrabayesian.belief_a_measure import BeliefAMeasure
-from ..infrabayesian.belief_infradistribution import BeliefInfradistribution
+from ..infrabayesian.a_measure import AMeasure
+from ..infrabayesian.infradistribution import Infradistribution
 from ..utils import dump_array
 
 
@@ -33,8 +33,8 @@ class InfraBayesianAgent(BaseGreedyAgent):
     def reset(self):
         super().reset()
         belief = self._belief_template.copy()
-        self.infradist = BeliefInfradistribution([
-            BeliefAMeasure(belief)  # single measure, lambda=1, b=0
+        self.infradist = Infradistribution([
+            AMeasure(belief)  # single measure, lambda=1, b=0
         ])
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:

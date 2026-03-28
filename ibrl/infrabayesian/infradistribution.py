@@ -1,19 +1,19 @@
-"""Belief-based Infradistribution — wraps BeliefAMeasure objects."""
+"""Infradistribution — wraps AMeasure objects."""
 import numpy as np
 from numpy.typing import NDArray
 
 from ..outcome import Outcome
-from .belief_a_measure import BeliefAMeasure
+from .a_measure import AMeasure
 
 
-class BeliefInfradistribution:
+class Infradistribution:
     """Infradistribution over belief-based a-measures.
 
     Non-KU (1 measure): returns that measure's model.
     KU (N measures): returns element-wise min over all models.
     """
 
-    def __init__(self, measures: list[BeliefAMeasure]):
+    def __init__(self, measures: list[AMeasure]):
         self.measures = measures
 
     def update(self, action: int, outcome: Outcome, context: dict | None = None):
