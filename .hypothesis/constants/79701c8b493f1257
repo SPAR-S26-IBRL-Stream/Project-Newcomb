@@ -1,4 +1,0 @@
-# file: /home/zkmathquant/AIdev/spar26spring/Project-Newcomb-forked/ibrl/utils/construction.py
-# hypothesis_version: 6.151.9
-
-[19088743, 2309737967, ',', ':', '=', 'Invalid agent type: ', 'asymmetric-damascus', 'bandit', 'bayesian', 'classical', 'coordination', 'damascus', 'exp3', 'experimental1', 'experimental2', 'experimental3', 'newcomb', 'num_runs', 'num_steps', 'pdbandit', 'seed', 'switching']
