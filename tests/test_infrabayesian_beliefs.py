@@ -6,8 +6,8 @@ from ibrl.outcome import Outcome
 from ibrl.infrabayesian.beliefs import (
     BaseBelief, BernoulliBelief, GaussianBelief, NewcombLikeBelief,
 )
-from ibrl.infrabayesian.belief_a_measure import BeliefAMeasure
-from ibrl.infrabayesian.belief_infradistribution import BeliefInfradistribution
+from ibrl.infrabayesian.a_measure import AMeasure
+from ibrl.infrabayesian.infradistribution import Infradistribution
 from ibrl.agents.infrabayesian import InfraBayesianAgent
 from ibrl.environments.bandit import BanditEnvironment
 from ibrl.environments.bernoulli_bandit import BernoulliBanditEnvironment
@@ -80,14 +80,14 @@ class TestNewcombLikeBelief:
         assert np.isnan(b.observed[1, 1])  # original unaffected
 
 
-# ── BeliefAMeasure ───────────────────────────────────────────────────────────
+# ── AMeasure ───────────────────────────────────────────────────────────
 
-class TestBeliefAMeasure:
+class TestAMeasure:
     def test_passthrough_with_unit_scale_zero_offset(self):
-        """With lambda=1, b=0, BeliefAMeasure is a pure pass-through."""
+        """With lambda=1, b=0, AMeasure is a pure pass-through."""
         belief = BernoulliBelief(num_actions=2)
         belief.update(action=0, outcome=Outcome(reward=1.0))
-        bam = BeliefAMeasure(belief)
+        bam = AMeasure(belief)
         np.testing.assert_allclose(
             bam.expected_reward_model(),
             belief.expected_reward_model(),
@@ -95,21 +95,21 @@ class TestBeliefAMeasure:
 
     def test_scale_and_offset_applied(self):
         belief = BernoulliBelief(num_actions=2)
-        bam = BeliefAMeasure(belief, log_scale=np.log(2.0), offset=0.1)
+        bam = AMeasure(belief, log_scale=np.log(2.0), offset=0.1)
         model = bam.expected_reward_model()
         expected = 2.0 * belief.expected_reward_model() + 0.1
         np.testing.assert_allclose(model, expected)
 
 
-# ── BeliefInfradistribution ─────────────────────────────────────────────────
+# ── Infradistribution ─────────────────────────────────────────────────
 
-class TestBeliefInfradistribution:
+class TestInfradistribution:
     def test_single_measure_passthrough(self):
         """Non-KU: single measure, should match belief directly."""
         belief = BernoulliBelief(num_actions=2)
         belief.update(action=0, outcome=Outcome(reward=1.0))
-        bam = BeliefAMeasure(belief)
-        infradist = BeliefInfradistribution([bam])
+        bam = AMeasure(belief)
+        infradist = Infradistribution([bam])
         np.testing.assert_allclose(
             infradist.expected_reward_model(),
             belief.expected_reward_model(),
@@ -117,8 +117,8 @@ class TestBeliefInfradistribution:
 
     def test_update_propagates_to_belief(self):
         belief = BernoulliBelief(num_actions=2)
-        bam = BeliefAMeasure(belief)
-        infradist = BeliefInfradistribution([bam])
+        bam = AMeasure(belief)
+        infradist = Infradistribution([bam])
         infradist.update(action=0, outcome=Outcome(reward=1.0))
         # Belief should have been updated
         model = infradist.expected_reward_model()

@@ -15,8 +15,8 @@ import pytest
 
 from ibrl.outcome import Outcome
 from ibrl.infrabayesian.beliefs import BernoulliBelief, NewcombLikeBelief
-from ibrl.infrabayesian.belief_a_measure import BeliefAMeasure
-from ibrl.infrabayesian.belief_infradistribution import BeliefInfradistribution
+from ibrl.infrabayesian.a_measure import AMeasure
+from ibrl.infrabayesian.infradistribution import Infradistribution
 from ibrl.agents.infrabayesian import InfraBayesianAgent
 
 
@@ -45,8 +45,8 @@ def _make_two_measure_setup(g=1.0):
     """
     belief_a = _make_bernoulli_belief(2, {0: (2, 4)})
     belief_b = _make_bernoulli_belief(2, {0: (4, 2)})
-    measures = [BeliefAMeasure(belief_a), BeliefAMeasure(belief_b)]
-    return BeliefInfradistribution(measures, g=g)
+    measures = [AMeasure(belief_a), AMeasure(belief_b)]
+    return Infradistribution(measures, g=g)
 
 
 # ── observation_probability ────────────────────────────────────────────────
@@ -104,7 +104,7 @@ class TestNonKUUnchanged:
 
     def test_single_measure_scale_stays_one(self):
         belief = BernoulliBelief(num_actions=2)
-        infradist = BeliefInfradistribution([BeliefAMeasure(belief)], g=1.0)
+        infradist = Infradistribution([AMeasure(belief)], g=1.0)
 
         for _ in range(10):
             infradist.update(action=0, outcome=Outcome(reward=1.0))
@@ -116,7 +116,7 @@ class TestNonKUUnchanged:
     def test_single_measure_model_matches_direct_belief(self):
         belief_direct = BernoulliBelief(num_actions=2)
         belief_infra = BernoulliBelief(num_actions=2)
-        infradist = BeliefInfradistribution([BeliefAMeasure(belief_infra)], g=1.0)
+        infradist = Infradistribution([AMeasure(belief_infra)], g=1.0)
 
         rng = np.random.default_rng(42)
         for _ in range(20):
@@ -313,11 +313,11 @@ class TestValidation:
     def test_g_out_of_range_raises(self):
         belief = BernoulliBelief(num_actions=2)
         with pytest.raises(ValueError, match="g must be in"):
-            BeliefInfradistribution([BeliefAMeasure(belief)], g=1.5)
+            Infradistribution([AMeasure(belief)], g=1.5)
 
     def test_empty_measures_raises(self):
         with pytest.raises(ValueError, match="at least one measure"):
-            BeliefInfradistribution([], g=1.0)
+            Infradistribution([], g=1.0)
 
     def test_agent_empty_beliefs_raises(self):
         with pytest.raises(ValueError, match="non-empty list"):

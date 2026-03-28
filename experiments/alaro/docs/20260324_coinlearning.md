@@ -444,13 +444,13 @@ class SwitchingBelief(BaseBelief):
 
 Enumerates over T switch times only. O(T×K) per step.
 
-### 6.3 `BeliefAMeasure`
+### 6.3 `AMeasure`
 
 Wraps a belief with the (λ, b) structure needed for IB. In non-KU mode,
 λ=1 and b=0, making this a pure pass-through.
 
 ```python
-class BeliefAMeasure:
+class AMeasure:
     def __init__(self, belief, log_scale=0.0, offset=0.0):
         self.belief = belief
         self.log_scale = log_scale  # log(λ)
@@ -470,7 +470,7 @@ class BeliefAMeasure:
 ```python
 class Infradistribution:
     def __init__(self, measures):
-        self.measures = measures  # list of BeliefAMeasure
+        self.measures = measures  # list of AMeasure
 
     def update(self, action, outcome, context=None):
         for m in self.measures:
@@ -519,7 +519,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
         super().reset()
         belief = self._belief_template.copy()
         self.infradist = Infradistribution([
-            BeliefAMeasure(belief)  # single measure, λ=1, b=0
+            AMeasure(belief)  # single measure, λ=1, b=0
         ])
 
     def update(self, probabilities, action, outcome):
@@ -691,10 +691,10 @@ construct scenarios where the average is misleading. A KU agent reasons about
 the **worst case** across its model set, making it robust to adversarial or
 ambiguous environments.
 
-**How it shows up in our code**: Currently, the `BeliefInfradistribution`
-wraps a single `BeliefAMeasure` (one belief with λ=1, b=0). This is the
+**How it shows up in our code**: Currently, the `Infradistribution`
+wraps a single `AMeasure` (one belief with λ=1, b=0). This is the
 non-KU case — pure Bayesian learning. In the KU case, we'd have **multiple**
-`BeliefAMeasure` objects, each wrapping its own independent belief with its
+`AMeasure` objects, each wrapping its own independent belief with its
 own (λ, b). The expected reward model becomes the **element-wise minimum**
 across all measures — pessimistic/robust reasoning.
 
@@ -714,7 +714,7 @@ We have an **infradistribution** H — a set of a-measures.
   normalized distribution μ over outcomes)
 - `b ≥ 0` is an offset
 
-**Our code**: `BeliefAMeasure` stores these as three separate pieces:
+**Our code**: `AMeasure` stores these as three separate pieces:
 - `belief` = the normalized distribution μ (via sufficient statistics,
   e.g., Beta(α, β) for BernoulliBelief)
 - `log_scale` = log(λ), the scale factor (in log space for numerical
@@ -736,7 +736,7 @@ you: "under my model of the world, the expected value of f is α(f)."
 
 In our bandit setting, the f we care about most is the **reward function**:
 "how much reward does each outcome give?" When we call
-`BeliefAMeasure.expected_reward_model()`, we're evaluating α on this
+`AMeasure.expected_reward_model()`, we're evaluating α on this
 specific f, getting E[reward | arm=a] for each arm.
 
 Definition 11 also evaluates the a-measure on two trivial functions:
@@ -749,15 +749,15 @@ tractable — we never need to evaluate arbitrary functions over the full
 history space.
 
 In code: `exp(log_scale) * belief.expected_reward_model() + offset`
-(this is exactly what `BeliefAMeasure.expected_reward_model()` returns).
+(this is exactly what `AMeasure.expected_reward_model()` returns).
 
 The **infradistribution** evaluates `f` by taking the **worst case**
 across all its a-measures:
 
 $$E_H(f) = \min_{(m,b) \in H} [m(f) + b] = \min_k [\lambda_k \cdot \mu_k(f) + b_k]$$
 
-In code: `BeliefInfradistribution.expected_reward_model()` computes
-`np.min(models, axis=0)` where each model comes from one `BeliefAMeasure`.
+In code: `Infradistribution.expected_reward_model()` computes
+`np.min(models, axis=0)` where each model comes from one `AMeasure`.
 
 This is the key pessimism: the agent always asks "what's the least I can
 expect?"
@@ -830,7 +830,7 @@ in the belief-based approach: its work is absorbed into the formulas.
 When you observe "arm 0, reward 1", the function `g` says how much you
 "care about" the counterfactual outcomes (arm 0 reward 0, etc.).
 
-In code: stored as `self.g` on `BeliefInfradistribution` (a constant,
+In code: stored as `self.g` on `Infradistribution` (a constant,
 default 1.0). See §7.3 for why g=1 is recommended.
 
 #### The update formula
@@ -1054,7 +1054,7 @@ However, **g = 1 (constant) is a well-motivated simplification**:
 - It's simple to implement and reason about
 
 **Our implementation will NOT require g to be constant forever.** The
-interface accepts g as a parameter on `BeliefInfradistribution`. For
+interface accepts g as a parameter on `Infradistribution`. For
 Phase 4, we use g=1 (constant). A future refinement could make g a
 callable `g(step, belief_state) -> float` that adapts over time, or
 derive it from the agent's value estimates. But constant g=1 exercises
@@ -1256,12 +1256,12 @@ def observation_probability(self, action, outcome):
     return 1.0 if outcome.reward == expected else 0.0
 ```
 
-Note: `BeliefAMeasure` does NOT need its own `observation_probability()`
+Note: `AMeasure` does NOT need its own `observation_probability()`
 method. The infradistribution's `_snapshot_measures()` calls
 `m.belief.observation_probability()` directly and combines it with
 `exp(m.log_scale)` as needed (see §7.5.2).
 
-#### 7.5.2 Changes to BeliefInfradistribution
+#### 7.5.2 Changes to Infradistribution
 
 The `update()` method gains the KU logic. For a single measure (non-KU),
 behavior is unchanged. For multiple measures (KU), it applies Definition 11.
@@ -1297,7 +1297,7 @@ class _MeasureSnapshot:
         self.not_obs_prob = 1.0 - self.obs_prob
 
 
-class BeliefInfradistribution:
+class Infradistribution:
     def __init__(self, measures, g=1.0):
         if len(measures) == 0:
             raise ValueError("Must provide at least one measure")
@@ -1526,11 +1526,11 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def reset(self):
         super().reset()
-        measures = [BeliefAMeasure(b.copy()) for b in self._belief_templates]
-        self.infradist = BeliefInfradistribution(measures, g=self._g)
+        measures = [AMeasure(b.copy()) for b in self._belief_templates]
+        self.infradist = Infradistribution(measures, g=self._g)
 ```
 
-The `BeliefInfradistribution.update()` already handles both cases
+The `Infradistribution.update()` already handles both cases
 gracefully: with one measure, the KU offset/scale adjustments are no-ops
 (see §7.4 sanity check), so the behavior is identical to the current
 non-KU code path. We still keep the `len(self.measures) == 1` early
@@ -1630,7 +1630,7 @@ instead of explicit history vectors.
 | File | Commit | Contents |
 |------|--------|----------|
 | `ibrl/infrabayesian/__init__.py` | 1 | Public exports |
-| `ibrl/infrabayesian/a_measure.py` | 1 | `AMeasure` (explicit history); `BeliefAMeasure` added in commit 3 |
+| `ibrl/infrabayesian/a_measure.py` | 1 | `AMeasure` (explicit history); `AMeasure` added in commit 3 |
 | `ibrl/infrabayesian/infradistribution.py` | 1 | `Infradistribution` class |
 | `ibrl/infrabayesian/helpers.py` | 1 | `match()`, `glue()`, reward functions |
 | `ibrl/infrabayesian/beliefs.py` | 3 | `BaseBelief`, `BanditBelief`, `NewcombLikeBelief`, `SwitchingBelief` |
@@ -1643,7 +1643,7 @@ instead of explicit history vectors.
 |------|--------|--------|
 | `ibrl/infrabayesian/a_measure.py` | 2 | Add `is_valid()` |
 | `ibrl/infrabayesian/infradistribution.py` | 2 | Fix offset bug, add normalization warning |
-| `ibrl/infrabayesian/a_measure.py` | 3 | Add `BeliefAMeasure` |
+| `ibrl/infrabayesian/a_measure.py` | 3 | Add `AMeasure` |
 | `ibrl/infrabayesian/infradistribution.py` | 3 | Add belief-based `update()` and `expected_reward_model()` |
 | `ibrl/environments/switching.py` | 3 | Change `_resolve` from Gaussian to Bernoulli |
 | `ibrl/agents/__init__.py` | 3 | Add `InfraBayesianAgent` |
@@ -1681,8 +1681,8 @@ instead of explicit history vectors.
 │     │                                 │                                   │  │
 │     │                                 │  ┌─────────────────────────────┐  │  │
 │     │                                 │  │     Infradistribution      │  │  │
-│     │                                 │  │  Non-KU: 1 BeliefAMeasure  │  │  │
-│     │                                 │  │  KU:     N BeliefAMeasures │  │  │
+│     │                                 │  │  Non-KU: 1 AMeasure  │  │  │
+│     │                                 │  │  KU:     N AMeasures │  │  │
 │     │                                 │  │                             │  │  │
 │     │                                 │  │  update(action, out, ctx)   │  │  │
 │     │                                 │  │  expected_reward_model(ctx) │  │  │
@@ -1690,7 +1690,7 @@ instead of explicit history vectors.
 │     │                                 │  │    KU: element-wise min     │  │  │
 │     │                                 │  │                             │  │  │
 │     │                                 │  │  ┌───────────────────────┐ │  │  │
-│     │                                 │  │  │  BeliefAMeasure       │ │  │  │
+│     │                                 │  │  │  AMeasure       │ │  │  │
 │     │                                 │  │  │  (λ, b, belief)       │ │  │  │
 │     │                                 │  │  │  λ*model + b          │ │  │  │
 │     │                                 │  │  │                       │ │  │  │
@@ -1726,7 +1726,7 @@ Data flow (one step, non-KU):
     ─────────                                         ─────
     1. calls agent.get_probabilities()
                                               MODEL: infradist.expected_reward_model()
-                                                     -> BeliefAMeasure.expected_reward_model()
+                                                     -> AMeasure.expected_reward_model()
                                                         -> belief.expected_reward_model()
                                                            returns reward vector/matrix
                                               PLAN:  if 1D: build_greedy_policy(values)
@@ -1737,7 +1737,7 @@ Data flow (one step, non-KU):
     3. calls env.step(π, action) -> Outcome
     4. calls agent.update(π, action, outcome)
                                               MODEL: infradist.update(action, outcome, ctx)
-                                                     -> BeliefAMeasure.update(...)
+                                                     -> AMeasure.update(...)
                                                         -> belief.update(action, outcome, ctx)
                                                            updates sufficient stats
 ```

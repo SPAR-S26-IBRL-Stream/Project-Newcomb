@@ -1,11 +1,11 @@
-"""Belief-based Infradistribution — wraps BeliefAMeasure objects."""
+"""Infradistribution — wraps AMeasure objects."""
 from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
 
 from ..outcome import Outcome
-from .belief_a_measure import BeliefAMeasure
+from .a_measure import AMeasure
 
 
 @dataclass
@@ -33,7 +33,7 @@ class _MeasureSnapshot:
         self.not_obs_prob = 1.0 - self.obs_prob
 
 
-class BeliefInfradistribution:
+class Infradistribution:
     """Infradistribution over belief-based a-measures.
 
     Non-KU (1 measure): returns that measure's model.
@@ -43,7 +43,7 @@ class BeliefInfradistribution:
     See experiments/alaro/docs/20260324_coinlearning.md §7.2-7.4.
     """
 
-    def __init__(self, measures: list[BeliefAMeasure], g: float = 1.0):
+    def __init__(self, measures: list[AMeasure], g: float = 1.0):
         if len(measures) == 0:
             raise ValueError("Must provide at least one measure")
         if not (0.0 <= g <= 1.0):

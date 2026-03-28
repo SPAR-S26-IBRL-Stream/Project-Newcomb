@@ -4,8 +4,8 @@ from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..infrabayesian.beliefs import BaseBelief
-from ..infrabayesian.belief_a_measure import BeliefAMeasure
-from ..infrabayesian.belief_infradistribution import BeliefInfradistribution
+from ..infrabayesian.a_measure import AMeasure
+from ..infrabayesian.infradistribution import Infradistribution
 from ..outcome import Outcome
 from ..utils import dump_array
 
@@ -39,8 +39,8 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def reset(self):
         super().reset()
-        measures = [BeliefAMeasure(b.copy()) for b in self._belief_templates]
-        self.infradist = BeliefInfradistribution(measures, g=self._g)
+        measures = [AMeasure(b.copy()) for b in self._belief_templates]
+        self.infradist = Infradistribution(measures, g=self._g)
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
         """MODEL phase: update beliefs with observation."""
