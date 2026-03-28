@@ -185,38 +185,38 @@ class TestNewcombLikeEquivalence:
             np.testing.assert_allclose(agent_model, direct_model, atol=1e-12)
 
 
-# ── GaussianBelief ↔ BayesianAgent equivalence ───────────────────────────────
+# ── BernoulliBelief ↔ BernoulliBayesianAgent equivalence ──────────────────────
 
-class TestGaussianBeliefMatchesBayesianAgent:
-    """IB agent with GaussianBelief should produce identical rewards to BayesianAgent
-    on the same bandit environment with the same seed and epsilon."""
+class TestBernoulliBeliefMatchesBernoulliBayesianAgent:
+    """IB agent with BernoulliBelief should produce identical rewards to
+    BernoulliBayesianAgent on the same bernoulli bandit with same seed/epsilon."""
 
-    def test_identical_rewards_on_bandit(self):
-        from ibrl.agents import BayesianAgent
+    def test_identical_rewards_on_bernoulli_bandit(self):
+        from ibrl.agents import BernoulliBayesianAgent
 
         seed = 42
         n = 3
         env_seed = 99
         opts = {"num_steps": 100, "num_runs": 5}
 
-        env = BanditEnvironment(num_actions=n, seed=env_seed)
-        bayesian = BayesianAgent(num_actions=n, seed=seed, epsilon=0.1)
+        env = BernoulliBanditEnvironment(num_actions=n, seed=env_seed)
+        bayesian = BernoulliBayesianAgent(num_actions=n, seed=seed, epsilon=0.1)
         r_bay = simulate(env, bayesian, opts)
 
-        env = BanditEnvironment(num_actions=n, seed=env_seed)
+        env = BernoulliBanditEnvironment(num_actions=n, seed=env_seed)
         ib = InfraBayesianAgent(
             num_actions=n, seed=seed,
-            beliefs=[GaussianBelief(num_actions=n)], epsilon=0.1,
+            beliefs=[BernoulliBelief(num_actions=n)], epsilon=0.1,
         )
         r_ib = simulate(env, ib, opts)
 
         np.testing.assert_array_equal(
             r_bay["rewards"], r_ib["rewards"],
-            err_msg="IB+GaussianBelief should produce identical rewards to BayesianAgent",
+            err_msg="IB+BernoulliBelief should produce identical rewards to BernoulliBayesianAgent",
         )
         np.testing.assert_array_equal(
             r_bay["actions"], r_ib["actions"],
-            err_msg="IB+GaussianBelief should produce identical actions to BayesianAgent",
+            err_msg="IB+BernoulliBelief should produce identical actions to BernoulliBayesianAgent",
         )
 
 

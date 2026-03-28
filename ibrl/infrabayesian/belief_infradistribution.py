@@ -54,13 +54,6 @@ class BeliefInfradistribution:
     # ── Public interface ──────────────────────────────────────────────
 
     def update(self, action: int, outcome: Outcome, context: dict | None = None):
-        if len(self.measures) == 1:
-            # Optimization: skip KU arithmetic when there's only one measure.
-            # The full KU path produces identical results (see §7.4 sanity
-            # check), but this avoids unnecessary computation.
-            self.measures[0].update(action, outcome, context)
-            return
-
         # KU update (Definition 11, §7.2)
         snapshots = self._snapshot_measures(action, outcome)
         normalization = self._observation_probability(snapshots)
