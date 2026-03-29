@@ -21,7 +21,7 @@ class BaseBelief(ABC):
         pass
 
     @abstractmethod
-    def expected_reward_model(self) -> NDArray[np.float64]:
+    def predict_rewards(self) -> NDArray[np.float64]:
         """The agent's current estimate of the reward structure.
 
         Returns:
@@ -31,7 +31,7 @@ class BaseBelief(ABC):
         pass
 
     @abstractmethod
-    def observation_probability(self, action: int, outcome: Outcome) -> float:
+    def compute_outcome_probability(self, action: int, outcome: Outcome) -> float:
         """P(this observation) under the current belief.
 
         Must be called BEFORE update(), since update() changes the
@@ -65,10 +65,10 @@ class BernoulliBelief(BaseBelief):
         self.alpha[action] += outcome.reward
         self.beta[action] += 1.0 - outcome.reward
 
-    def expected_reward_model(self) -> NDArray[np.float64]:
+    def predict_rewards(self) -> NDArray[np.float64]:
         return self.alpha / (self.alpha + self.beta)
 
-    def observation_probability(self, action: int, outcome: Outcome) -> float:
+    def compute_outcome_probability(self, action: int, outcome: Outcome) -> float:
         r = outcome.reward
         if not (0.0 <= r <= 1.0):
             raise ValueError(f"BernoulliBelief expects reward in [0, 1], got {r}")
@@ -104,10 +104,10 @@ class GaussianBelief(BaseBelief):
         ) / (self.precision[action] + 1.0)
         self.precision[action] += 1
 
-    def expected_reward_model(self) -> NDArray[np.float64]:
+    def predict_rewards(self) -> NDArray[np.float64]:
         return self.values.copy()
 
-    def observation_probability(self, action: int, outcome: Outcome) -> float:
+    def compute_outcome_probability(self, action: int, outcome: Outcome) -> float:
         """Not yet implemented — required for KU but not for non-KU (single belief).
 
         Needs an assumed observation noise variance (sigma^2) to compute
@@ -117,7 +117,7 @@ class GaussianBelief(BaseBelief):
         parameter. Could also be estimated from data.
         """
         raise NotImplementedError(
-            "GaussianBelief.observation_probability requires assumed "
+            "GaussianBelief.compute_outcome_probability requires assumed "
             "noise variance — see docstring for details"
         )
 
@@ -143,12 +143,12 @@ class NewcombLikeBelief(BaseBelief):
     def update(self, action: int, outcome: Outcome):
         self.observed[outcome.env_action, action] = outcome.reward
 
-    def expected_reward_model(self) -> NDArray[np.float64]:
+    def predict_rewards(self) -> NDArray[np.float64]:
         model = self.observed.copy()
         model[np.isnan(model)] = self.prior_mean
         return model
 
-    def observation_probability(self, action: int, outcome: Outcome) -> float:
+    def compute_outcome_probability(self, action: int, outcome: Outcome) -> float:
         expected = self.observed[outcome.env_action, action]
         if np.isnan(expected):
             return 1.0  # unobserved cell — any outcome is "expected"

@@ -49,50 +49,50 @@ def _make_two_measure_setup(g=1.0):
     return Infradistribution(measures, g=g)
 
 
-# ── observation_probability ────────────────────────────────────────────────
+# ── compute_outcome_probability ────────────────────────────────────────────
 
 class TestObservationProbability:
     def test_bernoulli_reward_1(self):
         """P(reward=1 | arm=0) = alpha / (alpha + beta)."""
         b = _make_bernoulli_belief(2, {0: (3, 7)})  # p = 0.3
-        prob = b.observation_probability(action=0, outcome=Outcome(reward=1.0))
+        prob = b.compute_outcome_probability(action=0, outcome=Outcome(reward=1.0))
         assert prob == pytest.approx(0.3)
 
     def test_bernoulli_reward_0(self):
         """P(reward=0 | arm=0) = beta / (alpha + beta)."""
         b = _make_bernoulli_belief(2, {0: (3, 7)})  # p = 0.3
-        prob = b.observation_probability(action=0, outcome=Outcome(reward=0.0))
+        prob = b.compute_outcome_probability(action=0, outcome=Outcome(reward=0.0))
         assert prob == pytest.approx(0.7)
 
     def test_bernoulli_uniform_prior(self):
         """Uniform Beta(1,1) -> P(reward=1) = P(reward=0) = 0.5."""
         b = BernoulliBelief(num_actions=2)
-        assert b.observation_probability(0, Outcome(reward=1.0)) == pytest.approx(0.5)
-        assert b.observation_probability(0, Outcome(reward=0.0)) == pytest.approx(0.5)
+        assert b.compute_outcome_probability(0, Outcome(reward=1.0)) == pytest.approx(0.5)
+        assert b.compute_outcome_probability(0, Outcome(reward=0.0)) == pytest.approx(0.5)
 
     def test_bernoulli_invalid_reward_raises(self):
         b = BernoulliBelief(num_actions=2)
         with pytest.raises(ValueError, match="reward in \\[0, 1\\]"):
-            b.observation_probability(0, Outcome(reward=1.5))
+            b.compute_outcome_probability(0, Outcome(reward=1.5))
 
     def test_newcomb_unobserved_cell_returns_1(self):
         """Unobserved cell: any outcome is 'expected', probability = 1."""
         b = NewcombLikeBelief(num_actions=2)
-        prob = b.observation_probability(0, Outcome(reward=0.7, env_action=0))
+        prob = b.compute_outcome_probability(0, Outcome(reward=0.7, env_action=0))
         assert prob == 1.0
 
     def test_newcomb_observed_cell_match(self):
         """Observed cell matching reward -> probability = 1."""
         b = NewcombLikeBelief(num_actions=2)
         b.update(action=0, outcome=Outcome(reward=1.0, env_action=0))
-        prob = b.observation_probability(0, Outcome(reward=1.0, env_action=0))
+        prob = b.compute_outcome_probability(0, Outcome(reward=1.0, env_action=0))
         assert prob == 1.0
 
     def test_newcomb_observed_cell_mismatch(self):
         """Observed cell not matching reward -> probability = 0."""
         b = NewcombLikeBelief(num_actions=2)
         b.update(action=0, outcome=Outcome(reward=1.0, env_action=0))
-        prob = b.observation_probability(0, Outcome(reward=0.0, env_action=0))
+        prob = b.compute_outcome_probability(0, Outcome(reward=0.0, env_action=0))
         assert prob == 0.0
 
 
@@ -129,7 +129,7 @@ class TestNonKUUnchanged:
 
             np.testing.assert_allclose(
                 infradist.evaluate(),
-                belief_direct.expected_reward_model(),
+                belief_direct.predict_rewards(),
                 atol=1e-12,
             )
 
@@ -191,12 +191,12 @@ class TestKUUpdateMath:
         infradist.update(action=0, outcome=Outcome(reward=1.0))
 
         # Belief A: was Beta(2,4) for arm 0 -> now Beta(3,4), p = 3/7
-        model_a = infradist.measures[0].belief.expected_reward_model()
+        model_a = infradist.measures[0].belief.predict_rewards()
         assert model_a[0] == pytest.approx(3.0 / 7.0)
         assert model_a[1] == pytest.approx(0.5)  # arm 1 unchanged
 
         # Belief B: was Beta(4,2) for arm 0 -> now Beta(5,2), p = 5/7
-        model_b = infradist.measures[1].belief.expected_reward_model()
+        model_b = infradist.measures[1].belief.predict_rewards()
         assert model_b[0] == pytest.approx(5.0 / 7.0)
         assert model_b[1] == pytest.approx(0.5)
 

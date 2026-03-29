@@ -23,4 +23,4 @@ class AMeasure:
     def evaluate(self) -> NDArray[np.float64]:
         """α(f) = λ · μ(f) + b"""
         scale = np.exp(self.log_scale)
-        return scale * self.belief.expected_reward_model() + self.offset
+        return scale * self.belief.predict_rewards() + self.offset

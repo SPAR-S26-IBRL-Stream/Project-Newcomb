@@ -70,7 +70,7 @@ class Infradistribution:
         snapshots = []
         for m in self.measures:
             snapshots.append(_MeasureSnapshot(
-                obs_prob=m.belief.observation_probability(action, outcome),
+                obs_prob=m.belief.compute_outcome_probability(action, outcome),
                 scale=np.exp(m.log_scale),
                 offset=m.offset,
             ))

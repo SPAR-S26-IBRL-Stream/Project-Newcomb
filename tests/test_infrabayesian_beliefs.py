@@ -22,7 +22,7 @@ from ibrl.utils import sample_action
 class TestBernoulliBelief:
     def test_initial_model_is_uniform(self):
         b = BernoulliBelief(num_actions=3)
-        model = b.expected_reward_model()
+        model = b.predict_rewards()
         np.testing.assert_allclose(model, [0.5, 0.5, 0.5])
 
     def test_update_shifts_estimate(self):
@@ -34,13 +34,13 @@ class TestBernoulliBelief:
         for _ in range(10):
             b.update(action=1, outcome=Outcome(reward=0.0))
 
-        model = b.expected_reward_model()
+        model = b.predict_rewards()
         assert model[0] > 0.8  # arm 0 should be estimated high
         assert model[1] < 0.2  # arm 1 should be estimated low
 
     def test_model_shape_is_1d(self):
         b = BernoulliBelief(num_actions=4)
-        assert b.expected_reward_model().shape == (4,)
+        assert b.predict_rewards().shape == (4,)
 
     def test_copy_is_independent(self):
         b = BernoulliBelief(num_actions=2)
@@ -48,7 +48,7 @@ class TestBernoulliBelief:
         c = b.copy()
         c.update(action=0, outcome=Outcome(reward=1.0))
         # Original should not be affected
-        assert b.expected_reward_model()[0] != c.expected_reward_model()[0]
+        assert b.predict_rewards()[0] != c.predict_rewards()[0]
 
 
 # ── NewcombLikeBelief ────────────────────────────────────────────────────────
@@ -56,13 +56,13 @@ class TestBernoulliBelief:
 class TestNewcombLikeBelief:
     def test_initial_model_is_prior_mean(self):
         b = NewcombLikeBelief(num_actions=2, prior_mean=0.5)
-        model = b.expected_reward_model()
+        model = b.predict_rewards()
         np.testing.assert_allclose(model, [[0.5, 0.5], [0.5, 0.5]])
 
     def test_update_records_observation(self):
         b = NewcombLikeBelief(num_actions=2)
         b.update(action=0, outcome=Outcome(reward=1.0, env_action=0))
-        model = b.expected_reward_model()
+        model = b.predict_rewards()
         assert model[0, 0] == 1.0
         # Other cells should still be prior
         assert model[0, 1] == 0.5
@@ -70,7 +70,7 @@ class TestNewcombLikeBelief:
 
     def test_model_shape_is_2d(self):
         b = NewcombLikeBelief(num_actions=3)
-        assert b.expected_reward_model().shape == (3, 3)
+        assert b.predict_rewards().shape == (3, 3)
 
     def test_copy_is_independent(self):
         b = NewcombLikeBelief(num_actions=2)
@@ -90,14 +90,14 @@ class TestAMeasure:
         bam = AMeasure(belief)
         np.testing.assert_allclose(
             bam.evaluate(),
-            belief.expected_reward_model(),
+            belief.predict_rewards(),
         )
 
     def test_scale_and_offset_applied(self):
         belief = BernoulliBelief(num_actions=2)
         bam = AMeasure(belief, log_scale=np.log(2.0), offset=0.1)
         model = bam.evaluate()
-        expected = 2.0 * belief.expected_reward_model() + 0.1
+        expected = 2.0 * belief.predict_rewards() + 0.1
         np.testing.assert_allclose(model, expected)
 
 
@@ -112,7 +112,7 @@ class TestInfradistribution:
         infradist = Infradistribution([bam])
         np.testing.assert_allclose(
             infradist.evaluate(),
-            belief.expected_reward_model(),
+            belief.predict_rewards(),
         )
 
     def test_update_propagates_to_belief(self):
@@ -149,7 +149,7 @@ class TestBanditEquivalence:
             agent.update(probs, action, outcome)
 
             # Compare reward models
-            direct_model = belief.expected_reward_model()
+            direct_model = belief.predict_rewards()
             agent_model = agent.infradist.evaluate()
             np.testing.assert_allclose(
                 agent_model, direct_model, atol=1e-12,
@@ -180,7 +180,7 @@ class TestNewcombLikeEquivalence:
             probs = agent.get_probabilities()
             agent.update(probs, action, outcome)
 
-            direct_model = belief.expected_reward_model()
+            direct_model = belief.predict_rewards()
             agent_model = agent.infradist.evaluate()
             np.testing.assert_allclose(agent_model, direct_model, atol=1e-12)
 
