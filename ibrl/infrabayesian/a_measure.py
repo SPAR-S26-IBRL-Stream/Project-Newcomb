@@ -17,10 +17,10 @@ class AMeasure:
         self.log_scale = log_scale  # log(lambda)
         self.offset = offset        # b
 
-    def update(self, action: int, outcome: Outcome, context: dict | None = None):
-        self.belief.update(action, outcome, context)
+    def update(self, action: int, outcome: Outcome):
+        self.belief.update(action, outcome)
 
-    def evaluate(self, context: dict | None = None) -> NDArray[np.float64]:
+    def evaluate(self) -> NDArray[np.float64]:
         """α(f) = λ · μ(f) + b"""
         scale = np.exp(self.log_scale)
-        return scale * self.belief.expected_reward_model(context) + self.offset
+        return scale * self.belief.expected_reward_model() + self.offset

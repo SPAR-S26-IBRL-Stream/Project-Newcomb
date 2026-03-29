@@ -150,7 +150,7 @@ class TestBanditEquivalence:
 
             # Compare reward models
             direct_model = belief.expected_reward_model()
-            agent_model = agent.infradist.evaluate(context={'step': agent.step})
+            agent_model = agent.infradist.evaluate()
             np.testing.assert_allclose(
                 agent_model, direct_model, atol=1e-12,
                 err_msg=f"Mismatch at step {step}",

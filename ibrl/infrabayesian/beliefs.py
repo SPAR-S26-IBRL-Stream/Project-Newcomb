@@ -16,12 +16,12 @@ class BaseBelief(ABC):
     """
 
     @abstractmethod
-    def update(self, action: int, outcome: Outcome, context: dict | None = None):
+    def update(self, action: int, outcome: Outcome):
         """Incorporate one observation into the sufficient statistics."""
         pass
 
     @abstractmethod
-    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
+    def expected_reward_model(self) -> NDArray[np.float64]:
         """The agent's current estimate of the reward structure.
 
         Returns:
@@ -59,13 +59,13 @@ class BernoulliBelief(BaseBelief):
         self.alpha = np.ones(num_actions)   # Beta prior alpha=1 (uniform)
         self.beta = np.ones(num_actions)    # Beta prior beta=1
 
-    def update(self, action: int, outcome: Outcome, context: dict | None = None):
+    def update(self, action: int, outcome: Outcome):
         if (outcome.reward < 0) or (outcome.reward > 1):
             raise ValueError(f"BernoulliBelief expects reward in [0, 1], got {outcome.reward}")
         self.alpha[action] += outcome.reward
         self.beta[action] += 1.0 - outcome.reward
 
-    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
+    def expected_reward_model(self) -> NDArray[np.float64]:
         return self.alpha / (self.alpha + self.beta)
 
     def observation_probability(self, action: int, outcome: Outcome) -> float:
@@ -97,14 +97,14 @@ class GaussianBelief(BaseBelief):
         self.values = np.zeros(num_actions)
         self.precision = np.ones(num_actions) * 0.1
 
-    def update(self, action: int, outcome: Outcome, context: dict | None = None):
+    def update(self, action: int, outcome: Outcome):
         r = outcome.reward
         self.values[action] = (
             self.precision[action] * self.values[action] + r
         ) / (self.precision[action] + 1.0)
         self.precision[action] += 1
 
-    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
+    def expected_reward_model(self) -> NDArray[np.float64]:
         return self.values.copy()
 
     def observation_probability(self, action: int, outcome: Outcome) -> float:
@@ -140,10 +140,10 @@ class NewcombLikeBelief(BaseBelief):
         self.prior_mean = prior_mean
         self.observed = np.full((num_actions, num_actions), np.nan)
 
-    def update(self, action: int, outcome: Outcome, context: dict | None = None):
+    def update(self, action: int, outcome: Outcome):
         self.observed[outcome.env_action, action] = outcome.reward
 
-    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
+    def expected_reward_model(self) -> NDArray[np.float64]:
         model = self.observed.copy()
         model[np.isnan(model)] = self.prior_mean
         return model

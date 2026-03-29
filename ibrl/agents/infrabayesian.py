@@ -44,7 +44,6 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
         """MODEL phase: update beliefs with observation."""
-        context = {'step': self.step, 'policy': probabilities}
         super().update(probabilities, action, outcome)  # base agent sees raw reward
 
         if self._utility is not None:
@@ -58,16 +57,14 @@ class InfraBayesianAgent(BaseGreedyAgent):
                 reward=mapped_reward,
                 env_action=outcome.env_action if hasattr(outcome, 'env_action') else None,
             )
-            self.infradist.update(action, mapped_outcome, context)
+            self.infradist.update(action, mapped_outcome)
         else:
-            self.infradist.update(action, outcome, context)
+            self.infradist.update(action, outcome)
 
     def get_probabilities(self) -> NDArray[np.float64]:
         """MODEL then PLAN: get reward structure, solve for policy."""
-        context = {'step': self.step}
-
         # MODEL: evaluate the reward function under worst-case measure
-        reward_model = self.infradist.evaluate(context)
+        reward_model = self.infradist.evaluate()
 
         # PLAN: convert reward structure into a policy
         if reward_model.ndim == 1:
@@ -90,6 +87,5 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return np.diag(V)
 
     def dump_state(self) -> str:
-        context = {'step': self.step}
-        model = self.infradist.evaluate(context)
+        model = self.infradist.evaluate()
         return dump_array(model) if model.ndim == 1 else dump_array(np.diag(model))

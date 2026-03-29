@@ -53,14 +53,14 @@ class Infradistribution:
 
     # ── Public interface ──────────────────────────────────────────────
 
-    def update(self, action: int, outcome: Outcome, context: dict | None = None):
+    def update(self, action: int, outcome: Outcome):
         # KU update (Definition 11, §7.2)
         snapshots = self._snapshot_measures(action, outcome)
         normalization = self._observation_probability(snapshots)
-        self._apply_ku_update(snapshots, normalization, action, outcome, context)
+        self._apply_ku_update(snapshots, normalization, action, outcome)
 
-    def evaluate(self, context: dict | None = None) -> NDArray[np.float64]:
-        models = [m.evaluate(context) for m in self.measures]
+    def evaluate(self) -> NDArray[np.float64]:
+        models = [m.evaluate() for m in self.measures]
         return np.min(models, axis=0)
 
     # ── Private: Definition 11 steps ──────────────────────────────────
@@ -108,7 +108,7 @@ class Infradistribution:
                 f"under worst-case measure), got {prob}")
         return prob
 
-    def _apply_ku_update(self, snapshots, normalization, action, outcome, context):
+    def _apply_ku_update(self, snapshots, normalization, action, outcome):
         """Apply Definition 11 to each a-measure.
 
         For each measure k:
@@ -122,7 +122,7 @@ class Infradistribution:
 
         for snap, m in zip(snapshots, self.measures):
             # (1) Bayesian update — belief conditions on observation
-            m.belief.update(action, outcome, context)
+            m.belief.update(action, outcome)
 
             # (2) Scale update — rescale by P_k(obs), normalize
             m.log_scale = np.log(snap.scale * snap.obs_prob / normalization)
