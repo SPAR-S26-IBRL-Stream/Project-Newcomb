@@ -94,7 +94,8 @@ class BernoulliBelief(BaseBelief):
 **Misspecified observations**: `BernoulliBelief.update()` raises `ValueError`
 if reward ∉ [0, 1]. The agent does not attempt to handle observations outside
 its belief's domain — this is by design (fail-fast). Use a utility mapping
-(§6) to transform arbitrary rewards into [0, 1] before they reach the belief.
+(see open question #8) to transform arbitrary rewards into [0, 1] before they
+reach the belief.
 
 ### A-measures
 
@@ -457,52 +458,7 @@ for future experimentation.
 
 ---
 
-## 6. Utility Mapping
-
-IB theory requires all functions to map to [0, 1]. Environments can produce
-arbitrary rewards. The agent applies an optional **utility mapping** that
-transforms raw rewards before passing them to the infradistribution.
-
-In the agent's `update()`:
-
-```python
-if self._utility is not None:
-    mapped_reward = self._utility(outcome.reward)
-    if not (0.0 <= mapped_reward <= 1.0):
-        raise ValueError(
-            f"Utility mapping must produce values in [0, 1], "
-            f"got {mapped_reward} from reward {outcome.reward}")
-    mapped_outcome = Outcome(
-        reward=mapped_reward,
-        env_action=outcome.env_action if hasattr(outcome, 'env_action') else None,
-    )
-    self.infradist.update(action, mapped_outcome)
-else:
-    self.infradist.update(action, outcome)
-```
-
-Usage:
-
-```python
-agent = InfraBayesianAgent(
-    beliefs=[...],
-    utility=lambda r: np.clip(r / 15.0, 0.0, 1.0),  # for Newcomb rewards in [0, 15]
-)
-```
-
-- Default: `None` (no mapping — suitable when rewards are already in [0, 1],
-  e.g., Bernoulli bandits)
-- The base agent still sees raw rewards (for regret tracking etc.)
-- Only the infradistribution sees mapped rewards
-- The mapping must produce values in [0, 1]; a `ValueError` is raised otherwise
-
-With a single belief, the utility mapping doesn't affect behavior (λ=1, b=0,
-only relative ordering matters). With multiple beliefs, it matters because
-the offset arithmetic assumes [0, 1] bounds.
-
----
-
-## 7. Concrete Example: BernoulliBelief KU
+## 6. Concrete Example: BernoulliBelief KU
 
 ### Setup
 
@@ -546,7 +502,7 @@ observation better.
 
 ---
 
-## 8. Test Coverage
+## 7. Test Coverage
 
 ### `test_infrabayesian_beliefs.py` (17 tests)
 
@@ -564,7 +520,7 @@ observation better.
   reward=1, boundary cases (p near 0 or 1)
 - **Single belief**: Definition 11 with one measure leaves λ=1, b=0
 - **Multiple beliefs**: hand-computed λ and b values after one update with
-  g=1.0 (the worked example in §7 above)
+  g=1.0 (the worked example in §6 above)
 - **g=0 degeneracy**: offsets stay 0, KU collapses
 - **g non-trivial** (g=0.5): intermediate behavior between g=0 and g=1
 - **Cohomogeneity**: λ+b=1 preserved over 20 multi-step updates with g=1
@@ -575,7 +531,7 @@ observation better.
 
 ---
 
-## 9. Open Questions
+## 8. Open Questions
 
 1. **How to choose initial beliefs?** The current demos use hand-picked Beta
    priors (e.g., pessimistic Beta(1,3) + optimistic Beta(3,1)). What's a
@@ -616,14 +572,16 @@ observation better.
    misspecified but another's isn't, should the misspecified one be removed
    from the infradistribution?
 
-8. **What are beliefs modeling — rewards or utilities?** When a utility
-   mapping is provided, the belief's sufficient statistics are trained on
-   mapped utilities, but the interface (`predict_rewards()`) and the belief
-   class names (`BernoulliBelief`) suggest raw rewards. The belief doesn't
-   know what it's been fed, and nothing in the type system makes the
-   distinction visible. This opacity may point to a missing abstraction —
-   perhaps the utility mapping should live closer to the belief, or the
-   belief should explicitly declare what domain it operates in.
+8. **Utility mapping and [0,1] bounds**: IB theory requires functions in
+   [0,1], but environments like Newcomb produce rewards in [0,15]. A utility
+   mapping parameter was previously implemented in the agent but removed
+   because the abstraction was leaky — the belief didn't know whether it was
+   being fed rewards or utilities, and the agent was rebuilding Outcome objects
+   with mapped values stuffed into the reward field. The mapping needs to be
+   reintroduced with a cleaner design. Options include: making it the caller's
+   responsibility (map before passing to the agent), putting it in the belief,
+   or using a wrapper/decorator pattern. Related: `predict_rewards()` is
+   misleading if the belief has been trained on mapped utilities.
 
 9. **Explore-exploit tradeoffs**: IB theory prescribes how to update and plan
    under ambiguity, but is silent on exploration. Worst-case planning over

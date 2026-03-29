@@ -323,19 +323,6 @@ class TestValidation:
         with pytest.raises(ValueError, match="non-empty list"):
             InfraBayesianAgent(num_actions=2, beliefs=[], epsilon=0.1)
 
-    def test_utility_out_of_range_raises(self):
-        """Utility mapping that produces values outside [0,1] should raise."""
-        bad_utility = lambda r: r * 2.0  # doubles reward, can exceed 1
-        agent = InfraBayesianAgent(
-            num_actions=2,
-            beliefs=[BernoulliBelief(num_actions=2)],
-            epsilon=0.1,
-            utility=bad_utility,
-        )
-        agent.reset()
-        probs = agent.get_probabilities()
-        with pytest.raises(ValueError, match="Utility mapping must produce"):
-            agent.update(probs, 0, Outcome(reward=0.8))
 
 
 # ── Agent integration with beliefs= kwarg ─────────────────────────────────

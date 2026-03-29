@@ -82,7 +82,7 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
     arguments.pop("num_runs", None)
     arguments["seed"] += seed_offset
 
-    # For infrabayesian agent, construct beliefs and optional utility from string kwargs
+    # For infrabayesian agent, construct beliefs from string kwargs
     if name == "infrabayesian":
         num_act = arguments["num_actions"]
         if "belief" in arguments:
