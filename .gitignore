@@ -51,3 +51,7 @@ results/*
 wandb/
 *.pkl
 *.pt
+
+# Hypothesis
+.hypothesis/
+coverage.xml

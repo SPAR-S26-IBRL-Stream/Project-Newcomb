@@ -7,6 +7,7 @@ from .damascus import DeathInDamascusEnvironment
 from .asymmetric_damascus import AsymmetricDeathInDamascusEnvironment
 from .coordination import CoordinationGameEnvironment
 from .policy_dependent_bandit import PolicyDependentBanditEnvironment
+from .Coin_tossing_game_envs import MatchEnvironment, ReverseTailsEnvironment
 
 __all__ = [
     "BaseEnvironment",
@@ -17,5 +18,7 @@ __all__ = [
     "DeathInDamascusEnvironment",
     "AsymmetricDeathInDamascusEnvironment",
     "CoordinationGameEnvironment",
-    "PolicyDependentBanditEnvironment"
+    "PolicyDependentBanditEnvironment",
+    "MatchEnvironment",
+    "ReverseTailsEnvironment"
 ]
