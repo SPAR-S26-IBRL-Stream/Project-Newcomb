@@ -38,6 +38,64 @@ well they predicted each observation.
 
 ## 2. Key Concepts
 
+### Beliefs
+
+A belief is the agent's epistemic model — its posterior over hypotheses,
+encoded via sufficient statistics. Beliefs are **independent of
+environments**: the agent chooses what to believe; the environment is
+indifferent.
+
+The abstract interface (`beliefs.py`):
+
+```python
+class BaseBelief(ABC):
+    @abstractmethod
+    def update(self, action: int, outcome: Outcome):
+        """Incorporate one observation into the sufficient statistics."""
+
+    @abstractmethod
+    def predict_rewards(self) -> NDArray[np.float64]:
+        """Current estimate of the reward structure.
+        Shape (num_actions,) for bandits, (num_env_actions, num_actions) for games."""
+
+    @abstractmethod
+    def compute_outcome_probability(self, action: int, outcome: Outcome) -> float:
+        """P(this observation) under the current belief.
+        Must be called BEFORE update() — uses prior parameters, not posterior."""
+
+    @abstractmethod
+    def copy(self) -> "BaseBelief":
+        """Return an independent copy."""
+```
+
+`BernoulliBelief` is the concrete implementation used throughout. It tracks
+a Beta(α, β) distribution per arm:
+
+```python
+class BernoulliBelief(BaseBelief):
+    def __init__(self, num_actions: int):
+        # Beta(1,1) uniform prior
+        self.alpha = np.ones(num_actions)   
+        self.beta = np.ones(num_actions)    
+
+    def update(self, action: int, outcome: Outcome):
+        self.alpha[action] += outcome.reward          # α += r
+        self.beta[action] += 1.0 - outcome.reward     # β += (1 - r)
+
+    def predict_rewards(self) -> NDArray[np.float64]:
+        return self.alpha / (self.alpha + self.beta)   # posterior mean per arm
+
+    def compute_outcome_probability(self, action: int, outcome: Outcome) -> float:
+        r = outcome.reward
+        p = self.alpha[action] / (self.alpha[action] + self.beta[action])
+        return p ** r * (1 - p) ** (1 - r)             # Bernoulli likelihood
+```
+
+**Misspecified observations**: `BernoulliBelief.update()` raises `ValueError`
+if reward ∉ [0, 1]. The agent does not attempt to handle observations outside
+its belief's domain — this is by design (fail-fast). Use a utility mapping
+(§6) to transform arbitrary rewards into [0, 1] before they reach the belief.
+
 ### A-measures
 
 An a-measure α = (λμ, b) is a scaled probability measure μ with scale λ ≥ 0
@@ -50,19 +108,21 @@ In code (`a_measure.py`):
 ```python
 class AMeasure:
     def __init__(self, belief: BaseBelief, log_scale: float = 0.0, offset: float = 0.0):
-        self.belief = belief         # μ — normalized distribution (sufficient statistics)
-        self.log_scale = log_scale   # log(λ) — scale in log space for numerical stability
-        self.offset = offset         # b
-    def expected_reward_model(self, context=None):
-        """α(f) = λ · μ(f) + b — named 'expected_reward_model' because the
-        belief returns posterior mean rewards per arm, and this method
-        applies the a-measure's scale and offset to that estimate."""
+        self.belief = belief
+        self.log_scale = log_scale  # log(λ) — log space for numerical stability
+        self.offset = offset        # b
+
+    def update(self, action: int, outcome: Outcome):
+        self.belief.update(action, outcome)
+
+    def evaluate(self) -> NDArray[np.float64]:
+        """α(f) = λ · μ(f) + b"""
         scale = np.exp(self.log_scale)
-        return scale * self.belief.expected_reward_model(context) + self.offset
+        return scale * self.belief.predict_rewards() + self.offset
 ```
 
-With a single belief, λ=1 and b=0 throughout, making this a standard
-probability measure.
+With a single belief, λ=1 and b=0 throughout, making `evaluate()` a pure
+pass-through to `belief.predict_rewards()`.
 
 ### Infradistributions
 
@@ -71,26 +131,20 @@ taking the **infimum** (worst case) over all its a-measures:
 
 $$E_H(f) = \min_k \left[\lambda_k \cdot \mu_k(f) + b_k\right]$$
 
+```python
+class Infradistribution:
+    def __init__(self, measures: list[AMeasure], g: float = 1.0):
+        self.measures = measures
+        self.g = g
+
+    def evaluate(self) -> NDArray[np.float64]:
+        # min across measures (axis=0), producing shape (num_actions,)
+        models = [m.evaluate() for m in self.measures]
+        return np.min(models, axis=0)
+```
+
 With a single a-measure, the min is a no-op and this reduces to ordinary
 expectation. With multiple a-measures, it gives worst-case reasoning.
-
-### Beliefs
-
-A belief is the agent's epistemic model — its posterior over hypotheses,
-encoded via sufficient statistics. Beliefs are **independent of
-environments**: the agent chooses what to believe; the environment is
-indifferent.
-
-`BernoulliBelief` tracks Beta(α, β) per arm:
-- `update(action, outcome)`: α[a] += r, β[a] += (1-r)
-- `expected_reward_model()`: returns α / (α + β) — posterior mean per arm
-- `observation_probability(action, outcome)`: p^r · (1-p)^(1-r) where
-  p = α[a] / (α[a] + β[a])
-
-**Misspecified observations**: `BernoulliBelief.update()` raises `ValueError`
-if reward ∉ [0, 1]. The agent does not attempt to handle observations outside
-its belief's domain — this is by design (fail-fast). Use a utility mapping
-(§6) to transform arbitrary rewards into [0, 1] before they reach the belief.
 
 ### Model/Planning Separation
 
@@ -108,79 +162,6 @@ belief. One-directional, like dynamic programming.
 
 ## 3. Architecture
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                            Simulator                                   │
-│                         (simulate loop)                                │
-│                                                                        │
-│  ┌──────────────────────┐         ┌──────────────────────────────────┐ │
-│  │   BaseEnvironment    │         │    InfraBayesianAgent            │ │
-│  │                      │         │    (BaseGreedyAgent)             │ │
-│  │  step(π, action)     │─ Outcome ─>                                │ │
-│  │   -> Outcome         │         │  ┌─ get_probabilities() ───────┐ │ │
-│  │                      │         │  │ MODEL: infradist            │ │ │
-│  │                      │         │  │   .expected_reward_model()  │ │ │
-│  └──────��───────────────┘         │  │ PLAN: build_greedy_policy() │ │ │
-│                                   │  └─────────────────────────────┘ │ │
-│                                   │                                  │ │
-│                                   │  ┌─ update(π, action, outcome) ┐ │ │
-│                                   │  │ (optional utility mapping)  │ │ │
-│                                   │  │ infradist.update(...)       │ │ │
-│                                   │  └────────────────────────────┘ │ │
-│                                   │                                  │ │
-│                                   │  ┌────────────────────────────┐  │ │
-│                                   │  │     Infradistribution      │  │ │
-│                                   │  │                            │  │ │
-│                                   │  │  1..N AMeasures            │  │ │
-│                                   │  │                            │  │ │
-│                                   │  │  expected_reward_model()   │  │ │
-│                                   │  │    -> min over measures    │  │ │
-│                                   │  │                            │  │ │
-│                                   │  │  update()                  │  │ │
-│                                   │  │    -> Definition 11        │  │ │
-│                                   │  │                            │  │ │
-│                                   │  │  ┌──────────────────────┐ │  │ │
-��                                   │  │  │   AMeasure           │ ��  │ │
-│                                   │  │  │   (log_scale, offset,│ │  │ │
-│                                   │  │  │    belief)           │ │  │ │
-│                                   │  │  │                      │ │  │ │
-│                                   │  │  │  expected_reward_     │ │  │ │
-│                                   │  │  │    model():          │ │  │ │
-│                                   │  │  │    λ * belief_model  �� │  │ │
-│                                   │  │  │     + offset         │ │  │ │
-│                                   │  │  │                      │ │  │ │
-│                                   │  │  │  ┌────────────────┐ │ │  │ │
-│                                   │  │  │  │ BernoulliBelief│ │ │  │ │
-│                                   │  │  │  │ Beta(α,β)/arm  │ │ │  │ │
-│                                   │  │  │  │ model: (K,)    │ │  │ │
-│                                   │  │  │  └────────────────┘ │ │  │ │
-│                                   │  │  └──────────────────────┘ │  │ │
-│                                   │  └────���───────────────────────┘  │ │
-│                                   └────���─────────────────────────────┘ │
-└───────────────────────────────────��────────────────────────────────────┘
-```
-
-### Data flow (one step)
-
-```
-Simulator                                    Agent
-─────────                                    ─────
-1. agent.get_probabilities()
-                                     MODEL: infradist.expected_reward_model()
-                                            -> for each AMeasure:
-                                                 λ * belief.expected_reward_model() + b
-                                            -> min over all measures
-                                     PLAN:  build_greedy_policy(values)
-                                     returns π
-
-2. sample action ~ π
-3. env.step(π, action) -> Outcome
-4. agent.update(π, action, outcome)
-                                     (utility mapping if provided)
-                                     infradist.update() — Definition 11
-                                       (see §4 below)
-```
-
 ### File layout
 
 | File | Contents |
@@ -193,12 +174,76 @@ Simulator                                    Agent
 | `tests/test_infrabayesian_beliefs.py` | Belief unit tests, single-belief equivalence tests |
 | `tests/test_knightian_uncertainty.py` | Definition 11 math tests, validation, cohomogeneity |
 
+### Agent lifecycle
+
+On `reset()`, the agent copies each belief template and wraps it in an
+AMeasure, then bundles them into an Infradistribution:
+
+```python
+class InfraBayesianAgent(BaseGreedyAgent):
+    def __init__(self, *args, beliefs: list[BaseBelief],
+                 g: float = 1.0, utility=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._belief_templates = beliefs
+        self._g = g
+        self._utility = utility
+
+    def reset(self):
+        super().reset()
+        measures = [AMeasure(b.copy()) for b in self._belief_templates]
+        self.infradist = Infradistribution(measures, g=self._g)
+```
+
+### Data flow (one step)
+
+**Planning** — `get_probabilities()`:
+
+```python
+def get_probabilities(self) -> NDArray[np.float64]:
+    # MODEL: evaluate the reward function under worst-case measure
+    reward_model = self.infradist.evaluate()
+
+    # PLAN: convert reward structure into a policy
+    if reward_model.ndim == 1:
+        values = reward_model                    # bandit: (num_actions,)
+    elif reward_model.ndim == 2:
+        values = self._solve_game(reward_model)  # game: use diagonal heuristic
+    return self.build_greedy_policy(values)
+```
+
+**Updating** — `update()`:
+
+```python
+def update(self, probabilities, action, outcome):
+    super().update(probabilities, action, outcome)  # base agent sees raw reward
+
+    if self._utility is not None:
+        mapped_reward = self._utility(outcome.reward)
+        mapped_outcome = Outcome(
+            reward=mapped_reward,
+            env_action=outcome.env_action if hasattr(outcome, 'env_action') else None,
+        )
+        self.infradist.update(action, mapped_outcome)
+    else:
+        self.infradist.update(action, outcome)
+```
+
+The simulator calls these in a loop:
+
+```
+1. π = agent.get_probabilities()        # MODEL + PLAN
+2. action ~ π                            # sample
+3. outcome = env.step(π, action)         # environment responds
+4. agent.update(π, action, outcome)      # MODEL update (Definition 11)
+```
+
 ---
 
 ## 4. The Update Rule (Definition 11)
 
-This section explains the infradistribution's update step, using the `BernoulliBelief` as a concrete example. Each term is
-annotated with the corresponding code in `infradistribution.py`.
+This section walks through `Infradistribution.update()`, which implements
+Definition 11 from *Basic Inframeasure Theory*. The full method is shown
+at the end of this section; the subsections below explain each piece.
 
 ### Setup
 
@@ -213,20 +258,38 @@ The counterfactual value function `g` is a constant (default g=1; see §5).
 
 ### Step 1: Snapshot pre-update state
 
-Before updating any beliefs, capture each measure's observation probability.
-This is critical because `observation_probability()` uses the current
-(prior) parameters, not the posterior.
+Before updating any beliefs, capture each measure's state. This is critical
+because `compute_outcome_probability()` uses the current (prior) parameters,
+not the posterior.
 
 For BernoulliBelief, the observation probability under measure k is:
 
 $$P_k(\text{obs}) = p_k^r \cdot (1 - p_k)^{1-r}$$
 
-where $p_k = \alpha_k[a] / (\alpha_k[a] + \beta_k[a])$ is measure k's
-predicted probability of reward=1 on arm a.
+where $p_k = \alpha_k / (\alpha_k + \beta_k)$ is measure k's predicted
+probability of reward=1 on the pulled arm.
 
-**Code**: `_snapshot_measures()` → creates `_MeasureSnapshot` for each
-measure, storing `obs_prob`, `scale` (λ), and `offset` (b). The dataclass
-computes `not_obs_prob = 1 - obs_prob` internally.
+```python
+@dataclass
+class _MeasureSnapshot:
+    obs_prob: float       # μ_k(L)     — P(observation) under this belief
+    scale: float          # λ_k        — exp(log_scale)
+    offset: float         # b_k        — current offset
+    not_obs_prob: float = field(init=False)  # 1 - obs_prob
+
+    def __post_init__(self):
+        self.not_obs_prob = 1.0 - self.obs_prob
+
+def _snapshot_measures(self, action, outcome):
+    snapshots = []
+    for m in self.measures:
+        snapshots.append(_MeasureSnapshot(
+            obs_prob=m.belief.compute_outcome_probability(action, outcome),
+            scale=np.exp(m.log_scale),
+            offset=m.offset,
+        ))
+    return snapshots
+```
 
 ### Step 2: Compute normalization
 
@@ -247,6 +310,31 @@ The first term is each measure's value of "1 on observed, g on non-observed."
 The second term is each measure's counterfactual value — what it assigns to
 the non-observed branch alone.
 
+```python
+def _compute_counterfactual_value(self, snap: _MeasureSnapshot) -> float:
+    """α_k((1-L) · g) = g · λ · P(not obs) + b"""
+    return self.g * snap.scale * snap.not_obs_prob + snap.offset
+
+def _compute_full_value(self, snap: _MeasureSnapshot) -> float:
+    """α_k(1 ★_L g) = λ · P(obs) + g · λ · P(not obs) + b"""
+    return (snap.scale * snap.obs_prob
+            + self.g * snap.scale * snap.not_obs_prob
+            + snap.offset)
+
+def _compute_normalization(self, snapshots) -> float:
+    """P^g_H(L) = min_k[full_value_k] - min_k[counterfactual_value_k]"""
+    worst_case_full = min(self._compute_full_value(s) for s in snapshots)
+    worst_case_counterfactual = min(
+        self._compute_counterfactual_value(s) for s in snapshots
+    )
+    prob = worst_case_full - worst_case_counterfactual
+    if prob <= 0:
+        raise ValueError(
+            f"P^g_H(L) must be > 0 (observation has zero probability "
+            f"under worst-case measure), got {prob}")
+    return prob
+```
+
 **Note on history**: The agent does not store the full observation history.
 Instead, the history is fully encoded in each measure's sufficient statistics
 (α, β for BernoulliBelief) and a-measure parameters (λ, b). Each update step
@@ -255,18 +343,13 @@ past observations — this is the standard property of Bayesian sufficient
 statistics. The a-measure's λ and b track cumulative scale and counterfactual
 surplus from all prior updates.
 
-**Code**:
-- `_full_observation_value(snap)` → λ · obs_prob + g · λ · not_obs_prob + b
-- `_counterfactual_value(snap)` → g · λ · not_obs_prob + b
-- `_observation_probability(snapshots)` → min(full) - min(counterfactual)
-
 ### Step 3: Update each a-measure
 
 For each measure k, three things happen:
 
 **(a) Bayesian belief update** — standard conditioning on the observation:
 
-$$\alpha_k[a] \mathrel{+}= r, \quad \beta_k[a] \mathrel{+}= (1 - r)$$
+$$\alpha_k \mathrel{+}= r, \quad \beta_k \mathrel{+}= (1 - r)$$
 
 **(b) Scale update** — rescale λ by how well this measure predicted the
 observation, normalized by the infradistribution's probability:
@@ -280,21 +363,47 @@ upweighted. Measures that didn't predict it get downweighted.
 
 $$b_k^{\text{new}} = \frac{\text{cfval}_k - \min_j(\text{cfval}_j)}{P^g_H(L)}$$
 
-where $\text{cfval}_k = c \cdot \lambda_k \cdot (1 - P_k(\text{obs})) + b_k$.
+where $\text{cfval}_k = g \cdot \lambda_k \cdot (1 - P_k(\text{obs})) + b_k$.
 
 Measures that assign more value to the non-observed branch (relative to the
 worst-case measure) accumulate a larger offset. The offset tracks how much
 "counterfactual surplus" this measure carries — value it assigned to things
 that didn't happen, above the minimum.
 
-**Code**: `_apply_ku_update()` ties all three steps together.
+### Putting it all together
+
+The complete `update()` method — snapshot, normalize, then update each measure
+in a single loop:
+
+```python
+def update(self, action: int, outcome: Outcome):
+    snapshots = self._snapshot_measures(action, outcome)
+    normalization = self._compute_normalization(snapshots)
+
+    worst_case_counterfactual = min(
+        self._compute_counterfactual_value(s) for s in snapshots
+    )
+
+    for snap, m in zip(snapshots, self.measures):
+        # (a) Bayesian update — belief conditions on observation
+        m.belief.update(action, outcome)
+
+        # (b) Scale update — rescale by P_k(obs), normalize
+        m.log_scale = np.log(snap.scale * snap.obs_prob / normalization)
+
+        # (c) Offset update — absorb counterfactual surplus, normalize
+        counterfactual_surplus = (
+            self._compute_counterfactual_value(snap) - worst_case_counterfactual
+        )
+        m.offset = max(0.0, counterfactual_surplus) / normalization
+```
 
 ### Sanity check: single belief reduces to Bayesian
 
 With K=1, λ=1, b=0, the update naturally simplifies:
 - Counterfactual values: only one measure, so surplus is 0 → b stays 0
 - $P^g_H(L) = P_1(\text{obs})$ → λ_new = P(obs)/P(obs) = 1
-- Only the belief updates. Pure Bayesian conditioning. ✓
+- Only the belief updates. Pure Bayesian conditioning.
 
 No special-casing needed — the single code path handles this automatically.
 
@@ -354,6 +463,26 @@ IB theory requires all functions to map to [0, 1]. Environments can produce
 arbitrary rewards. The agent applies an optional **utility mapping** that
 transforms raw rewards before passing them to the infradistribution.
 
+In the agent's `update()`:
+
+```python
+if self._utility is not None:
+    mapped_reward = self._utility(outcome.reward)
+    if not (0.0 <= mapped_reward <= 1.0):
+        raise ValueError(
+            f"Utility mapping must produce values in [0, 1], "
+            f"got {mapped_reward} from reward {outcome.reward}")
+    mapped_outcome = Outcome(
+        reward=mapped_reward,
+        env_action=outcome.env_action if hasattr(outcome, 'env_action') else None,
+    )
+    self.infradist.update(action, mapped_outcome)
+else:
+    self.infradist.update(action, outcome)
+```
+
+Usage:
+
 ```python
 agent = InfraBayesianAgent(
     beliefs=[...],
@@ -409,7 +538,7 @@ Both start with λ=1, b=0. Using g=1.
 - b_A = (2/3 - 1/3) / (2/3) = 1/2
 - b_B = (1/3 - 1/3) / (2/3) = 0
 
-**Check cohomogeneity**: λ_A + b_A = 1/2 + 1/2 = 1 ✓, λ_B + b_B = 1 + 0 = 1 ✓
+**Check cohomogeneity**: λ_A + b_A = 1/2 + 1/2 = 1, λ_B + b_B = 1 + 0 = 1
 
 Measure A (pessimistic) got downweighted in scale but gained offset.
 Measure B (optimistic) kept full scale and zero offset — it predicted the
@@ -431,7 +560,7 @@ observation better.
 
 ### `test_knightian_uncertainty.py` (26 tests)
 
-- **Observation probability**: BernoulliBelief P(obs) for reward=0 and
+- **Outcome probability**: BernoulliBelief P(obs) for reward=0 and
   reward=1, boundary cases (p near 0 or 1)
 - **Single belief**: Definition 11 with one measure leaves λ=1, b=0
 - **Multiple beliefs**: hand-computed λ and b values after one update with
@@ -461,7 +590,7 @@ observation better.
    closure may introduce new extremal points. Currently we only track the
    initial vertices (an approximation). Monitor whether this causes issues.
 
-4. **GaussianBelief KU support**: `observation_probability()` is not yet
+4. **GaussianBelief KU support**: `compute_outcome_probability()` is not yet
    implemented for `GaussianBelief` — it needs an assumed noise variance.
    See the docstring on that method for notes.
 
@@ -474,3 +603,44 @@ observation better.
    which would matter for noisy sensors, continuous outcomes with soft
    likelihoods, or aggregated batch observations. Supporting this could
    demonstrate IB's theoretical advantages over standard Bayesian conditioning.
+
+7. **Out-of-support observations and belief misspecification**: There is a
+   meaningful distinction between *unlikely* data (reward=1 when p=0.01 —
+   handled fine, the belief just updates aggressively) and *out-of-support*
+   data (reward=0.5 under a Bernoulli belief — the belief literally cannot
+   represent this). Currently the code raises `ValueError` and crashes, but
+   this is not a principled answer. Observing out-of-support data is evidence
+   that the belief class itself is wrong. Should the agent discard beliefs
+   that can't accommodate the observation? Fall back to a more flexible belief
+   class? How does this interact with KU — if one measure's belief is
+   misspecified but another's isn't, should the misspecified one be removed
+   from the infradistribution?
+
+8. **What are beliefs modeling — rewards or utilities?** When a utility
+   mapping is provided, the belief's sufficient statistics are trained on
+   mapped utilities, but the interface (`predict_rewards()`) and the belief
+   class names (`BernoulliBelief`) suggest raw rewards. The belief doesn't
+   know what it's been fed, and nothing in the type system makes the
+   distinction visible. This opacity may point to a missing abstraction —
+   perhaps the utility mapping should live closer to the belief, or the
+   belief should explicitly declare what domain it operates in.
+
+9. **Explore-exploit tradeoffs**: IB theory prescribes how to update and plan
+   under ambiguity, but is silent on exploration. Worst-case planning over
+   multiple beliefs is *pessimistic* (avoid arms that could be bad), which is
+   the opposite of UCB-style *optimism* (try arms that could be good). Does
+   KU provide implicit exploration, or does it lead to underexploration by
+   settling on "safe" arms too quickly? Should we combine KU with explicit
+   exploration strategies (UCB, Thompson sampling) on top of the IB reward
+   model?
+
+10. **Should updates account for action selection probability?** The
+    `probabilities` argument is passed to `agent.update()` but ignored by
+    almost every agent (including IB). In contextual bandits, inverse
+    propensity weighting (IPW) corrects for the fact that rarely-chosen arms
+    produce observations that should be upweighted: r_hat = r / P(a_chosen).
+    Currently, Definition 11's P_k(obs) captures the *outcome* likelihood
+    under each belief, but not the *action selection* likelihood. For on-policy
+    Bayesian updates on the chosen arm this doesn't matter (we only update
+    the arm we pulled). But for off-policy learning or cross-arm inference,
+    ignoring the selection probability could introduce bias.

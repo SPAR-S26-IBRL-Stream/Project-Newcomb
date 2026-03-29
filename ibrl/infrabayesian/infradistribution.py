@@ -54,68 +54,10 @@ class Infradistribution:
     # ── Public interface ──────────────────────────────────────────────
 
     def update(self, action: int, outcome: Outcome):
-        # KU update (Definition 11, §7.2)
+        """Definition 11 update: snapshot, normalize, then update each measure."""
         snapshots = self._snapshot_measures(action, outcome)
         normalization = self._compute_normalization(snapshots)
-        self._apply_ku_update(snapshots, normalization, action, outcome)
 
-    def evaluate(self) -> NDArray[np.float64]:
-        models = [m.evaluate() for m in self.measures]
-        return np.min(models, axis=0)
-
-    # ── Private: Definition 11 steps ──────────────────────────────────
-
-    def _snapshot_measures(self, action, outcome):
-        """Capture each measure's state BEFORE updating beliefs."""
-        snapshots = []
-        for m in self.measures:
-            snapshots.append(_MeasureSnapshot(
-                obs_prob=m.belief.compute_outcome_probability(action, outcome),
-                scale=np.exp(m.log_scale),
-                offset=m.offset,
-            ))
-        return snapshots
-
-    def _compute_counterfactual_value(self, snap: _MeasureSnapshot) -> float:
-        """α_k((1-L) · g) — How much value does a-measure k assign to the
-        non-observed outcome, weighted by g?
-
-        = c · λ_k · P_k(not obs) + b_k
-        """
-        return self.g * snap.scale * snap.not_obs_prob + snap.offset
-
-    def _compute_full_value(self, snap: _MeasureSnapshot) -> float:
-        """α_k(1 ★_L g) — "1 on observed branch, g on non-observed branch."
-
-        = λ_k · P_k(obs) + c · λ_k · P_k(not obs) + b_k
-        """
-        return (snap.scale * snap.obs_prob
-                + self.g * snap.scale * snap.not_obs_prob
-                + snap.offset)
-
-    def _compute_normalization(self, snapshots: list[_MeasureSnapshot]) -> float:
-        """P^g_H(L) — The infradistribution's "probability" of the observation.
-
-        = E_H(1 ★_L g) - E_H(0 ★_L g)
-        = min_k[full_value_k] - min_k[counterfactual_value_k]
-        """
-        worst_case_full = min(self._compute_full_value(s) for s in snapshots)
-        worst_case_counterfactual = min(self._compute_counterfactual_value(s) for s in snapshots)
-        prob = worst_case_full - worst_case_counterfactual
-        if prob <= 0:
-            raise ValueError(
-                f"P^g_H(L) must be > 0 (observation has zero probability "
-                f"under worst-case measure), got {prob}")
-        return prob
-
-    def _apply_ku_update(self, snapshots, normalization, action, outcome):
-        """Apply Definition 11 to each a-measure.
-
-        For each measure k:
-          1. Bayesian update of belief (μ_k conditions on observation)
-          2. Scale update: λ_new = λ · P_k(obs) / P^g_H(L)
-          3. Offset update: absorb counterfactual value surplus, normalize
-        """
         worst_case_counterfactual = min(
             self._compute_counterfactual_value(s) for s in snapshots
         )
@@ -136,3 +78,42 @@ class Infradistribution:
                     f"counterfactual_surplus must be ≥ 0, got "
                     f"{counterfactual_surplus}")
             m.offset = max(0.0, counterfactual_surplus) / normalization
+
+    def evaluate(self) -> NDArray[np.float64]:
+        # min across measures (axis=0), producing shape (num_actions,)
+        models = [m.evaluate() for m in self.measures]
+        return np.min(models, axis=0)
+
+    # ── Private helpers ────────────────────────────────────────────────
+
+    def _snapshot_measures(self, action, outcome):
+        """Capture each measure's state BEFORE updating beliefs."""
+        snapshots = []
+        for m in self.measures:
+            snapshots.append(_MeasureSnapshot(
+                obs_prob=m.belief.compute_outcome_probability(action, outcome),
+                scale=np.exp(m.log_scale),
+                offset=m.offset,
+            ))
+        return snapshots
+
+    def _compute_counterfactual_value(self, snap: _MeasureSnapshot) -> float:
+        """α_k((1-L) · g) = g · λ · P(not obs) + b"""
+        return self.g * snap.scale * snap.not_obs_prob + snap.offset
+
+    def _compute_full_value(self, snap: _MeasureSnapshot) -> float:
+        """α_k(1 ★_L g) = λ · P(obs) + g · λ · P(not obs) + b"""
+        return (snap.scale * snap.obs_prob
+                + self.g * snap.scale * snap.not_obs_prob
+                + snap.offset)
+
+    def _compute_normalization(self, snapshots: list[_MeasureSnapshot]) -> float:
+        """P^g_H(L) = min_k[full_value_k] - min_k[counterfactual_value_k]"""
+        worst_case_full = min(self._compute_full_value(s) for s in snapshots)
+        worst_case_counterfactual = min(self._compute_counterfactual_value(s) for s in snapshots)
+        prob = worst_case_full - worst_case_counterfactual
+        if prob <= 0:
+            raise ValueError(
+                f"P^g_H(L) must be > 0 (observation has zero probability "
+                f"under worst-case measure), got {prob}")
+        return prob
