@@ -56,8 +56,9 @@ class BernoulliBelief(BaseBelief):
 
     def __init__(self, num_actions: int):
         self.num_actions = num_actions
-        self.alpha = np.ones(num_actions)   # Beta prior alpha=1 (uniform)
-        self.beta = np.ones(num_actions)    # Beta prior beta=1
+        # Beta(1,1) uniform prior
+        self.alpha = np.ones(num_actions)
+        self.beta = np.ones(num_actions)
 
     def update(self, action: int, outcome: Outcome):
         if (outcome.reward < 0) or (outcome.reward > 1):
