@@ -18,7 +18,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
     multiple elements give Knightian uncertainty.
 
     get_probabilities() has two phases:
-      1. MODEL: ask infradist for the expected reward structure
+      1. MODEL: ask infradist to evaluate the reward function
       2. PLAN: solve for the best policy given that structure
 
     update() has one phase:
@@ -66,8 +66,8 @@ class InfraBayesianAgent(BaseGreedyAgent):
         """MODEL then PLAN: get reward structure, solve for policy."""
         context = {'step': self.step}
 
-        # MODEL: get the reward structure from the infradistribution
-        reward_model = self.infradist.expected_reward_model(context)
+        # MODEL: evaluate the reward function under worst-case measure
+        reward_model = self.infradist.evaluate(context)
 
         # PLAN: convert reward structure into a policy
         if reward_model.ndim == 1:
@@ -91,5 +91,5 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def dump_state(self) -> str:
         context = {'step': self.step}
-        model = self.infradist.expected_reward_model(context)
+        model = self.infradist.evaluate(context)
         return dump_array(model) if model.ndim == 1 else dump_array(np.diag(model))

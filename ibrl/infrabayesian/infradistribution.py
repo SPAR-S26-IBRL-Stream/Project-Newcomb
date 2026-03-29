@@ -59,8 +59,8 @@ class Infradistribution:
         normalization = self._observation_probability(snapshots)
         self._apply_ku_update(snapshots, normalization, action, outcome, context)
 
-    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
-        models = [m.expected_reward_model(context) for m in self.measures]
+    def evaluate(self, context: dict | None = None) -> NDArray[np.float64]:
+        models = [m.evaluate(context) for m in self.measures]
         return np.min(models, axis=0)
 
     # ── Private: Definition 11 steps ──────────────────────────────────

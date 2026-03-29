@@ -128,7 +128,7 @@ class TestNonKUUnchanged:
             infradist.update(action=action, outcome=outcome)
 
             np.testing.assert_allclose(
-                infradist.expected_reward_model(),
+                infradist.evaluate(),
                 belief_direct.expected_reward_model(),
                 atol=1e-12,
             )
@@ -200,8 +200,8 @@ class TestKUUpdateMath:
         assert model_b[0] == pytest.approx(5.0 / 7.0)
         assert model_b[1] == pytest.approx(0.5)
 
-    def test_expected_reward_model_is_elementwise_min(self):
-        """Infradistribution model = min over a-measure models."""
+    def test_evaluate_is_elementwise_min(self):
+        """Infradistribution.evaluate() = min over a-measure evaluations."""
         infradist = _make_two_measure_setup(g=1.0)
         infradist.update(action=0, outcome=Outcome(reward=1.0))
 
@@ -213,7 +213,7 @@ class TestKUUpdateMath:
         #   arm 1: 1 * 0.5 + 0 = 0.5
         # Min: arm 0 = 5/7, arm 1 = 0.5
 
-        model = infradist.expected_reward_model()
+        model = infradist.evaluate()
         assert model[0] == pytest.approx(5.0 / 7.0)
         assert model[1] == pytest.approx(0.5)
 

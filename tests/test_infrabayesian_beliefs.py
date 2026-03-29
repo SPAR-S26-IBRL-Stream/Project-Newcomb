@@ -89,14 +89,14 @@ class TestAMeasure:
         belief.update(action=0, outcome=Outcome(reward=1.0))
         bam = AMeasure(belief)
         np.testing.assert_allclose(
-            bam.expected_reward_model(),
+            bam.evaluate(),
             belief.expected_reward_model(),
         )
 
     def test_scale_and_offset_applied(self):
         belief = BernoulliBelief(num_actions=2)
         bam = AMeasure(belief, log_scale=np.log(2.0), offset=0.1)
-        model = bam.expected_reward_model()
+        model = bam.evaluate()
         expected = 2.0 * belief.expected_reward_model() + 0.1
         np.testing.assert_allclose(model, expected)
 
@@ -111,7 +111,7 @@ class TestInfradistribution:
         bam = AMeasure(belief)
         infradist = Infradistribution([bam])
         np.testing.assert_allclose(
-            infradist.expected_reward_model(),
+            infradist.evaluate(),
             belief.expected_reward_model(),
         )
 
@@ -121,7 +121,7 @@ class TestInfradistribution:
         infradist = Infradistribution([bam])
         infradist.update(action=0, outcome=Outcome(reward=1.0))
         # Belief should have been updated
-        model = infradist.expected_reward_model()
+        model = infradist.evaluate()
         assert model[0] > 0.5  # arm 0 should be higher after success
 
 
@@ -150,7 +150,7 @@ class TestBanditEquivalence:
 
             # Compare reward models
             direct_model = belief.expected_reward_model()
-            agent_model = agent.infradist.expected_reward_model(context={'step': agent.step})
+            agent_model = agent.infradist.evaluate(context={'step': agent.step})
             np.testing.assert_allclose(
                 agent_model, direct_model, atol=1e-12,
                 err_msg=f"Mismatch at step {step}",
@@ -181,7 +181,7 @@ class TestNewcombLikeEquivalence:
             agent.update(probs, action, outcome)
 
             direct_model = belief.expected_reward_model()
-            agent_model = agent.infradist.expected_reward_model()
+            agent_model = agent.infradist.evaluate()
             np.testing.assert_allclose(agent_model, direct_model, atol=1e-12)
 
 

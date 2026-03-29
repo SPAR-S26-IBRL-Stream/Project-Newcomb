@@ -20,7 +20,7 @@ class AMeasure:
     def update(self, action: int, outcome: Outcome, context: dict | None = None):
         self.belief.update(action, outcome, context)
 
-    def expected_reward_model(self, context: dict | None = None) -> NDArray[np.float64]:
-        """lambda * belief.expected_reward_model() + b"""
+    def evaluate(self, context: dict | None = None) -> NDArray[np.float64]:
+        """α(f) = λ · μ(f) + b"""
         scale = np.exp(self.log_scale)
         return scale * self.belief.expected_reward_model(context) + self.offset
