@@ -56,7 +56,7 @@ class Infradistribution:
     def update(self, action: int, outcome: Outcome):
         # KU update (Definition 11, §7.2)
         snapshots = self._snapshot_measures(action, outcome)
-        normalization = self._observation_probability(snapshots)
+        normalization = self._compute_normalization(snapshots)
         self._apply_ku_update(snapshots, normalization, action, outcome)
 
     def evaluate(self) -> NDArray[np.float64]:
@@ -76,7 +76,7 @@ class Infradistribution:
             ))
         return snapshots
 
-    def _counterfactual_value(self, snap: _MeasureSnapshot) -> float:
+    def _compute_counterfactual_value(self, snap: _MeasureSnapshot) -> float:
         """α_k((1-L) · g) — How much value does a-measure k assign to the
         non-observed outcome, weighted by g?
 
@@ -84,7 +84,7 @@ class Infradistribution:
         """
         return self.g * snap.scale * snap.not_obs_prob + snap.offset
 
-    def _full_observation_value(self, snap: _MeasureSnapshot) -> float:
+    def _compute_full_value(self, snap: _MeasureSnapshot) -> float:
         """α_k(1 ★_L g) — "1 on observed branch, g on non-observed branch."
 
         = λ_k · P_k(obs) + c · λ_k · P_k(not obs) + b_k
@@ -93,14 +93,14 @@ class Infradistribution:
                 + self.g * snap.scale * snap.not_obs_prob
                 + snap.offset)
 
-    def _observation_probability(self, snapshots: list[_MeasureSnapshot]) -> float:
+    def _compute_normalization(self, snapshots: list[_MeasureSnapshot]) -> float:
         """P^g_H(L) — The infradistribution's "probability" of the observation.
 
         = E_H(1 ★_L g) - E_H(0 ★_L g)
         = min_k[full_value_k] - min_k[counterfactual_value_k]
         """
-        worst_case_full = min(self._full_observation_value(s) for s in snapshots)
-        worst_case_counterfactual = min(self._counterfactual_value(s) for s in snapshots)
+        worst_case_full = min(self._compute_full_value(s) for s in snapshots)
+        worst_case_counterfactual = min(self._compute_counterfactual_value(s) for s in snapshots)
         prob = worst_case_full - worst_case_counterfactual
         if prob <= 0:
             raise ValueError(
@@ -117,7 +117,7 @@ class Infradistribution:
           3. Offset update: absorb counterfactual value surplus, normalize
         """
         worst_case_counterfactual = min(
-            self._counterfactual_value(s) for s in snapshots
+            self._compute_counterfactual_value(s) for s in snapshots
         )
 
         for snap, m in zip(snapshots, self.measures):
@@ -129,7 +129,7 @@ class Infradistribution:
 
             # (3) Offset update — absorb counterfactual surplus, normalize
             counterfactual_surplus = (
-                self._counterfactual_value(snap) - worst_case_counterfactual
+                self._compute_counterfactual_value(snap) - worst_case_counterfactual
             )
             if counterfactual_surplus < -1e-12:
                 raise ValueError(
