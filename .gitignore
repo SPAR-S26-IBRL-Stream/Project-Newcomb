@@ -51,6 +51,7 @@ results/*
 wandb/
 *.pkl
 *.pt
+uv.lock
 
 # Hypothesis
 .hypothesis/
