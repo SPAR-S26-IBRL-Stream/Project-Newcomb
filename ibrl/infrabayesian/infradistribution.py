@@ -1,36 +1,9 @@
 """Infradistribution — wraps AMeasure objects."""
-from dataclasses import dataclass, field
-
 import numpy as np
 from numpy.typing import NDArray
 
 from ..outcome import Outcome
 from .a_measure import AMeasure
-
-
-@dataclass
-class _MeasureSnapshot:
-    """Pre-update snapshot of one a-measure's state.
-
-    Captured BEFORE beliefs update, because the KU adjustment
-    needs the prior probabilities, not the posterior ones.
-    """
-    obs_prob: float       # μ_k(L)     — P(observation) under this belief
-    scale: float          # λ_k
-    offset: float         # b_k        — current offset
-    not_obs_prob: float = field(init=False)  # μ_k(1-L) — derived
-
-    def __post_init__(self):
-        if not (0.0 <= self.obs_prob <= 1.0):
-            raise ValueError(
-                f"obs_prob must be in [0, 1], got {self.obs_prob}")
-        if self.scale <= 0:
-            raise ValueError(
-                f"scale (λ) must be > 0, got {self.scale}")
-        if self.offset < -1e-12:
-            raise ValueError(
-                f"offset (b) must be ≥ 0, got {self.offset}")
-        self.not_obs_prob = 1.0 - self.obs_prob
 
 
 class Infradistribution:
@@ -54,66 +27,48 @@ class Infradistribution:
     # ── Public interface ──────────────────────────────────────────────
 
     def update(self, action: int, outcome: Outcome):
-        """Definition 11 update: snapshot, normalize, then update each measure."""
-        snapshots = self._snapshot_measures(action, outcome)
-        normalization = self._compute_normalization(snapshots)
+        """Definition 11 update: compute aggregates, then update each measure."""
+        # Compute obs_prob for each measure
+        outcome_probs = [m.belief.compute_outcome_probability(action, outcome)
+                     for m in self.measures]
+        # Compute normalization and worst case counterfactual
+        worst_case_full = min(self._compute_full_value(m, op)
+                              for m, op in zip(self.measures, outcome_probs))
+        worst_case_cf = min(self._compute_counterfactual_value(m, op)
+                            for m, op in zip(self.measures, outcome_probs))
+        normalization = worst_case_full - worst_case_cf
+        if normalization <= 0:
+            raise ValueError(
+                f"P^g_H(L) must be > 0 (observation has zero probability "
+                f"under worst-case measure), got {normalization}")
 
-        worst_case_counterfactual = min(
-            self._compute_counterfactual_value(s) for s in snapshots
-        )
-
-        for snap, m in zip(snapshots, self.measures):
-            # (1) Bayesian update — belief conditions on observation
-            m.belief.update(action, outcome)
-
-            # (2) Scale update — rescale by P_k(obs), normalize
-            m.scale = snap.scale * snap.obs_prob / normalization
-
-            # (3) Offset update — absorb counterfactual surplus, normalize
-            counterfactual_surplus = (
-                self._compute_counterfactual_value(snap) - worst_case_counterfactual
-            )
-            if counterfactual_surplus < -1e-12:
+        # Update each measure: scale & offset first (from pre-update values), then belief
+        for m, obs_prob in zip(self.measures, outcome_probs):
+            # (1) Offset update — absorb counterfactual surplus, normalize
+            cf_surplus = self._compute_counterfactual_value(m, obs_prob) - worst_case_cf
+            if cf_surplus < -1e-12:
                 raise ValueError(
-                    f"counterfactual_surplus must be ≥ 0, got "
-                    f"{counterfactual_surplus}")
-            m.offset = max(0.0, counterfactual_surplus) / normalization
+                    f"counterfactual_surplus must be ≥ 0, got {cf_surplus}")
+            m.offset = max(0.0, cf_surplus) / normalization
+            
+            # (2) Scale update — rescale by P_k(obs), normalize
+            m.scale = m.scale * obs_prob / normalization
+
+            # (3) Bayesian update — belief conditions on observation            
+            m.belief.update(action, outcome)
 
     def evaluate(self) -> NDArray[np.float64]:
         # min across measures (axis=0), producing shape (num_actions,)
         models = [m.evaluate() for m in self.measures]
         return np.min(models, axis=0)
-
+    
     # ── Private helpers ────────────────────────────────────────────────
 
-    def _snapshot_measures(self, action, outcome):
-        """Capture each measure's state BEFORE updating beliefs."""
-        snapshots = []
-        for m in self.measures:
-            snapshots.append(_MeasureSnapshot(
-                obs_prob=m.belief.compute_outcome_probability(action, outcome),
-                scale=m.scale,
-                offset=m.offset,
-            ))
-        return snapshots
-
-    def _compute_counterfactual_value(self, snap: _MeasureSnapshot) -> float:
+    def _compute_counterfactual_value(self, m: AMeasure, obs_prob: float)-> float:
         """α_k((1-L) · g) = g · λ · P(not obs) + b"""
-        return self.g * snap.scale * snap.not_obs_prob + snap.offset
+        return self.g * m.scale * (1.0 - obs_prob) + m.offset
 
-    def _compute_full_value(self, snap: _MeasureSnapshot) -> float:
+    def _compute_full_value(self, m: AMeasure, obs_prob: float) -> float:
         """α_k(1 ★_L g) = λ · P(obs) + g · λ · P(not obs) + b"""
-        return (snap.scale * snap.obs_prob
-                + self.g * snap.scale * snap.not_obs_prob
-                + snap.offset)
+        return m.scale * obs_prob + self.g * m.scale * (1.0 - obs_prob) + m.offset
 
-    def _compute_normalization(self, snapshots: list[_MeasureSnapshot]) -> float:
-        """P^g_H(L) = min_k[full_value_k] - min_k[counterfactual_value_k]"""
-        worst_case_full = min(self._compute_full_value(s) for s in snapshots)
-        worst_case_counterfactual = min(self._compute_counterfactual_value(s) for s in snapshots)
-        prob = worst_case_full - worst_case_counterfactual
-        if prob <= 0:
-            raise ValueError(
-                f"P^g_H(L) must be > 0 (observation has zero probability "
-                f"under worst-case measure), got {prob}")
-        return prob
