@@ -93,9 +93,9 @@ class BernoulliBelief(BaseBelief):
 
 **Misspecified observations**: `BernoulliBelief.update()` raises `ValueError`
 if reward ∉ [0, 1]. The agent does not attempt to handle observations outside
-its belief's domain — this is by design (fail-fast). Use a utility mapping
-(see open question #8) to transform arbitrary rewards into [0, 1] before they
-reach the belief.
+its belief's domain — this is by design (fail-fast). For environments with
+rewards outside [0, 1], a reward-to-value mapping is needed before the
+observation reaches the belief (see open question #8).
 
 ### A-measures
 
@@ -183,11 +183,10 @@ AMeasure, then bundles them into an Infradistribution:
 ```python
 class InfraBayesianAgent(BaseGreedyAgent):
     def __init__(self, *args, beliefs: list[BaseBelief],
-                 g: float = 1.0, utility=None, **kwargs):
+                 g: float = 1.0, **kwargs):
         super().__init__(*args, **kwargs)
         self._belief_templates = beliefs
         self._g = g
-        self._utility = utility
 
     def reset(self):
         super().reset()
@@ -216,17 +215,8 @@ def get_probabilities(self) -> NDArray[np.float64]:
 
 ```python
 def update(self, probabilities, action, outcome):
-    super().update(probabilities, action, outcome)  # base agent sees raw reward
-
-    if self._utility is not None:
-        mapped_reward = self._utility(outcome.reward)
-        mapped_outcome = Outcome(
-            reward=mapped_reward,
-            env_action=outcome.env_action if hasattr(outcome, 'env_action') else None,
-        )
-        self.infradist.update(action, mapped_outcome)
-    else:
-        self.infradist.update(action, outcome)
+    super().update(probabilities, action, outcome)
+    self.infradist.update(action, outcome)
 ```
 
 The simulator calls these in a loop:
@@ -294,7 +284,7 @@ def _snapshot_measures(self, action, outcome):
 
 ### Step 2: Compute normalization
 
-The infradistribution's "probability" of the observation:
+The infradistribution's "probability" of the observation (How much value does actually observing L add, beyond what I'd get from the counterfactual path alone?):
 
 $$P^g_H(L) = E_H(1 \star_L g) - E_H(0 \star_L g)$$
 
