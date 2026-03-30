@@ -110,7 +110,7 @@ class TestNonKUUnchanged:
             infradist.update(action=0, outcome=Outcome(reward=1.0))
 
         m = infradist.measures[0]
-        assert m.log_scale == pytest.approx(0.0, abs=1e-12)
+        assert m.scale == pytest.approx(1.0, abs=1e-12)
         assert m.offset == pytest.approx(0.0, abs=1e-12)
 
     def test_single_measure_model_matches_direct_belief(self):
@@ -164,8 +164,8 @@ class TestKUUpdateMath:
         infradist = _make_two_measure_setup(g=1.0)
         infradist.update(action=0, outcome=Outcome(reward=1.0))
 
-        lambda_a = np.exp(infradist.measures[0].log_scale)
-        lambda_b = np.exp(infradist.measures[1].log_scale)
+        lambda_a = infradist.measures[0].scale
+        lambda_b = infradist.measures[1].scale
         assert lambda_a == pytest.approx(0.5)
         assert lambda_b == pytest.approx(1.0)
 
@@ -182,7 +182,7 @@ class TestKUUpdateMath:
         infradist.update(action=0, outcome=Outcome(reward=1.0))
 
         for m in infradist.measures:
-            lam = np.exp(m.log_scale)
+            lam = m.scale
             assert lam + m.offset == pytest.approx(1.0)
 
     def test_beliefs_updated_bayesian(self):
@@ -229,7 +229,7 @@ class TestKUUpdateMath:
 
             # Check invariants after each step
             for m in infradist.measures:
-                lam = np.exp(m.log_scale)
+                lam = m.scale
                 assert lam > 0, f"lambda must be > 0, got {lam}"
                 assert m.offset >= -1e-12, f"offset must be >= 0, got {m.offset}"
                 # g=1 cohomogeneity
@@ -261,8 +261,8 @@ class TestGZeroDegeneracy:
         infradist = _make_two_measure_setup(g=0.0)
         infradist.update(action=0, outcome=Outcome(reward=1.0))
 
-        lambda_a = np.exp(infradist.measures[0].log_scale)
-        lambda_b = np.exp(infradist.measures[1].log_scale)
+        lambda_a = infradist.measures[0].scale
+        lambda_b = infradist.measures[1].scale
         assert lambda_a == pytest.approx(1.0)
         assert lambda_b == pytest.approx(2.0)
 
@@ -301,8 +301,8 @@ class TestGNonTrivial:
         infradist = _make_two_measure_setup(g=0.5)
         infradist.update(action=0, outcome=Outcome(reward=1.0))
 
-        lambda_a = np.exp(infradist.measures[0].log_scale)
-        lambda_b = np.exp(infradist.measures[1].log_scale)
+        lambda_a = infradist.measures[0].scale
+        lambda_b = infradist.measures[1].scale
         assert lambda_a == pytest.approx(2.0 / 3.0)
         assert lambda_b == pytest.approx(4.0 / 3.0)
 

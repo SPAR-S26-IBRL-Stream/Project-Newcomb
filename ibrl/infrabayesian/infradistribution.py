@@ -16,7 +16,7 @@ class _MeasureSnapshot:
     needs the prior probabilities, not the posterior ones.
     """
     obs_prob: float       # μ_k(L)     — P(observation) under this belief
-    scale: float          # λ_k        — exp(log_scale)
+    scale: float          # λ_k
     offset: float         # b_k        — current offset
     not_obs_prob: float = field(init=False)  # μ_k(1-L) — derived
 
@@ -67,7 +67,7 @@ class Infradistribution:
             m.belief.update(action, outcome)
 
             # (2) Scale update — rescale by P_k(obs), normalize
-            m.log_scale = np.log(snap.scale * snap.obs_prob / normalization)
+            m.scale = snap.scale * snap.obs_prob / normalization
 
             # (3) Offset update — absorb counterfactual surplus, normalize
             counterfactual_surplus = (
@@ -92,7 +92,7 @@ class Infradistribution:
         for m in self.measures:
             snapshots.append(_MeasureSnapshot(
                 obs_prob=m.belief.compute_outcome_probability(action, outcome),
-                scale=np.exp(m.log_scale),
+                scale=m.scale,
                 offset=m.offset,
             ))
         return snapshots

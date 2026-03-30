@@ -95,7 +95,7 @@ class TestAMeasure:
 
     def test_scale_and_offset_applied(self):
         belief = BernoulliBelief(num_actions=2)
-        bam = AMeasure(belief, log_scale=np.log(2.0), offset=0.1)
+        bam = AMeasure(belief, scale=2.0, offset=0.1)
         model = bam.evaluate()
         expected = 2.0 * belief.predict_rewards() + 0.1
         np.testing.assert_allclose(model, expected)

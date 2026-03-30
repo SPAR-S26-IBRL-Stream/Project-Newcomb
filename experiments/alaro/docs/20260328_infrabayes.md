@@ -108,18 +108,17 @@ In code (`a_measure.py`):
 
 ```python
 class AMeasure:
-    def __init__(self, belief: BaseBelief, log_scale: float = 0.0, offset: float = 0.0):
+    def __init__(self, belief: BaseBelief, scale: float = 1.0, offset: float = 0.0):
         self.belief = belief
-        self.log_scale = log_scale  # log(λ) — log space for numerical stability
-        self.offset = offset        # b
+        self.scale = scale    # λ
+        self.offset = offset  # b
 
     def update(self, action: int, outcome: Outcome):
         self.belief.update(action, outcome)
 
     def evaluate(self) -> NDArray[np.float64]:
         """α(f) = λ · μ(f) + b"""
-        scale = np.exp(self.log_scale)
-        return scale * self.belief.predict_rewards() + self.offset
+        return self.scale * self.belief.predict_rewards() + self.offset
 ```
 
 With a single belief, λ=1 and b=0 throughout, making `evaluate()` a pure
@@ -240,7 +239,7 @@ at the end of this section; the subsections below explain each piece.
 
 We have K a-measures. Each a-measure k has:
 - A `BernoulliBelief` with parameters (α_k, β_k) per arm
-- Scale factor λ_k (`exp(log_scale)`)
+- Scale factor λ_k (`scale`)
 - Offset b_k (`offset`)
 
 We observe: pulled arm `a`, got reward `r ∈ {0, 1}`.
@@ -264,7 +263,7 @@ probability of reward=1 on the pulled arm.
 @dataclass
 class _MeasureSnapshot:
     obs_prob: float       # μ_k(L)     — P(observation) under this belief
-    scale: float          # λ_k        — exp(log_scale)
+    scale: float          # λ_k
     offset: float         # b_k        — current offset
     not_obs_prob: float = field(init=False)  # 1 - obs_prob
 
@@ -276,7 +275,7 @@ def _snapshot_measures(self, action, outcome):
     for m in self.measures:
         snapshots.append(_MeasureSnapshot(
             obs_prob=m.belief.compute_outcome_probability(action, outcome),
-            scale=np.exp(m.log_scale),
+            scale=m.scale,
             offset=m.offset,
         ))
     return snapshots
@@ -380,7 +379,7 @@ def update(self, action: int, outcome: Outcome):
         m.belief.update(action, outcome)
 
         # (b) Scale update — rescale by P_k(obs), normalize
-        m.log_scale = np.log(snap.scale * snap.obs_prob / normalization)
+        m.scale = snap.scale * snap.obs_prob / normalization
 
         # (c) Offset update — absorb counterfactual surplus, normalize
         counterfactual_surplus = (
