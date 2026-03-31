@@ -1,4 +1,6 @@
 """Infradistribution — wraps AMeasure objects."""
+import warnings
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -21,6 +23,15 @@ class Infradistribution:
             raise ValueError("Must provide at least one measure")
         if not (0.0 <= g <= 1.0):
             raise ValueError(f"g must be in [0, 1], got {g}")
+        if 0.0 < g < 1.0:
+            warnings.warn(
+                f"g={g}: for 0 < g < 1, individual a-measure cohomogeneity (λ+b ≤ 1) "
+                f"is not preserved by Definition 11 for non-worst-case measures. "
+                f"Offsets compound exponentially, causing numerical blowup over many "
+                f"steps. The infradistribution's lower envelope remains valid, but "
+                f"results may degrade. Use g=1 (default) for stable behavior.",
+                stacklevel=2,
+            )
         self.measures = measures
         self.g = g
 
@@ -54,19 +65,14 @@ class Infradistribution:
             # (2) Scale update — rescale by P_k(obs), normalize
             m.scale = m.scale * obs_prob / normalization
 
-            # (3) Bayesian update — belief conditions on observation
-            m.belief.update(action, outcome)
-
-            # If we update with g==1, we conserve cohomogeneity (λ+b=1).
-            # However, due to numerical inaccuracies, we do not conserve this condition exactly.
-            # Deviations from this condition build up exponentially over multiple steps and can
-            # quickly dominate the behaviour of the infradistribution. By enforcing this condition
-            # after the update, we can avoid accumulation of numerical errors.
-            # This is not a complete solution, as it only works for g==1. Ideally we should find a
-            # way to rewrite the update equation, that is stable to small perturbations.
+            # (3) Enforce cohomogeneity: with g=1, λ+b=1 is an invariant
+            # that exact arithmetic preserves but floating point doesn't.
             if float(self.g) == 1.0:
                 assert abs(m.scale + m.offset - 1) < 1e-12
                 m.scale = 1 - m.offset
+
+            # (4) Bayesian update — belief conditions on observation
+            m.belief.update(action, outcome)
 
     def evaluate(self) -> NDArray[np.float64]:
         # min across measures (axis=0), producing shape (num_actions,)

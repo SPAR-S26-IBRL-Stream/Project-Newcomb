@@ -503,7 +503,7 @@ observation better.
   rewards/actions to `BernoulliBayesianAgent` on the same bernoulli bandit
 - **Simulator integration**: agent learns on bernoulli bandit, runs on Newcomb
 
-### `test_knightian_uncertainty.py` (26 tests)
+### `test_knightian_uncertainty.py` (27 tests)
 
 - **Outcome probability**: BernoulliBelief P(obs) for reward=0 and
   reward=1, boundary cases (p near 0 or 1)
@@ -512,7 +512,8 @@ observation better.
   g=1.0 (the worked example in §6 above)
 - **g=0 degeneracy**: offsets stay 0, KU collapses
 - **g non-trivial** (g=0.5): intermediate behavior between g=0 and g=1
-- **Cohomogeneity**: λ+b=1 preserved over 20 multi-step updates with g=1
+- **Cohomogeneity**: λ+b=1 preserved over 20 multi-step updates with g=1;
+  100-step long-run test with asymmetric priors confirms drift stays < 1e-3
 - **Validation**: ValueError for invalid g, empty measures, out-of-range
   probabilities
 - **Agent integration**: `beliefs=[single]` works, `beliefs=[multiple]`
@@ -581,7 +582,21 @@ observation better.
    exploration strategies (UCB, Thompson sampling) on top of the IB reward
    model?
 
-10. **Should updates account for action selection probability?** The
+10. **0<g<1 causes cohomogeneity blowup in individual a-measures**: Definition
+    11 uses a global normalization (P^g_H(L) = min over all measures) rather
+    than per-measure normalization. With g=1 all measures have the same full
+    value (λ+b=1 → α(1★_L 1)=1), so the global normalization works perfectly.
+    With g<1, full values differ across measures, and non-worst-case measures
+    end up with λ+b > 1 after each update — compounding exponentially. The
+    infradistribution's lower envelope (the min) remains valid, but individual
+    measures blow up numerically. Note: even with g=1, floating point error
+    seeds the same instability if not corrected — the code enforces m.scale =
+    1 - m.offset as a projection step for g=1. For g<1 no such projection is
+    known. Options: (a) per-measure normalization (deviates from Definition 11),
+    (b) periodic clamping/projection (not theoretically justified), (c) pruning
+    irrelevant measures whose floor exceeds others' max, (d) restrict to g=1.
+
+11. **Should updates account for action selection probability?** The
     `probabilities` argument is passed to `agent.update()` but ignored by
     almost every agent (including IB). In contextual bandits, inverse
     propensity weighting (IPW) corrects for the fact that rarely-chosen arms
