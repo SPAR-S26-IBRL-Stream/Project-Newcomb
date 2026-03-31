@@ -54,8 +54,19 @@ class Infradistribution:
             # (2) Scale update — rescale by P_k(obs), normalize
             m.scale = m.scale * obs_prob / normalization
 
-            # (3) Bayesian update — belief conditions on observation            
+            # (3) Bayesian update — belief conditions on observation
             m.belief.update(action, outcome)
+
+            # If we update with g==1, we conserve cohomogeneity (λ+b=1).
+            # However, due to numerical inaccuracies, we do not conserve this condition exactly.
+            # Deviations from this condition build up exponentially over multiple steps and can
+            # quickly dominate the behaviour of the infradistribution. By enforcing this condition
+            # after the update, we can avoid accumulation of numerical errors.
+            # This is not a complete solution, as it only works for g==1. Ideally we should find a
+            # way to rewrite the update equation, that is stable to small perturbations.
+            if float(self.g) == 1.0:
+                assert abs(m.scale + m.offset - 1) < 1e-12
+                m.scale = 1 - m.offset
 
     def evaluate(self) -> NDArray[np.float64]:
         # min across measures (axis=0), producing shape (num_actions,)
