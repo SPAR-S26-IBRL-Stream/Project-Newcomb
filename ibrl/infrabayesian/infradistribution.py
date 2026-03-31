@@ -72,3 +72,5 @@ class Infradistribution:
         """α_k(1 ★_L g) = λ · P(obs) + g · λ · P(not obs) + b"""
         return m.scale * obs_prob + self.g * m.scale * (1.0 - obs_prob) + m.offset
 
+    def __repr__(self) -> str:
+        return "[" + (",".join(str(m) for m in self.measures)) + "]"

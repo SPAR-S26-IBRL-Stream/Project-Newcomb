@@ -5,6 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ..outcome import Outcome
+from ..utils import dump_array
 
 
 class BaseBelief(ABC):
@@ -82,6 +83,9 @@ class BernoulliBelief(BaseBelief):
         c.alpha = self.alpha.copy()
         c.beta = self.beta.copy()
         return c
+
+    def __repr__(self) -> str:
+        return f"""BB(α={dump_array(self.alpha,"%.0f")};β={dump_array(self.beta,"%.0f")})"""
 
 
 class GaussianBelief(BaseBelief):

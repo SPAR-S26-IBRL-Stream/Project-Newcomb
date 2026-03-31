@@ -71,5 +71,8 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return np.diag(V)
 
     def dump_state(self) -> str:
+        # At higher verbosity level: print entire infradistribution
+        if self.verbose > 1:
+            return str(self.infradist)
         model = self.infradist.evaluate()
         return dump_array(model) if model.ndim == 1 else dump_array(np.diag(model))
