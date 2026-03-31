@@ -32,11 +32,13 @@ The convex combination experiment (allowing Murphy to pick from the convex hull 
 
 Because the expected reward is linear with respect to the opponent's policy, the reward against a mixed adversarial strategy $q_{mix} = \sum \lambda_i q_i$ is simply $\sum \lambda_i R(q_i)$. Since $\lambda_i \ge 0$ and $\sum \lambda_i = 1$, this expected reward is strictly bounded by the minimum and maximum of the pure components:
 
+
 $$
 \sum \lambda_i R(q_i) \ge \min_i R(q_i)
 $$
 
-Therefore, the minimizer is always achieved at a vertex (i.e., setting $\lambda_i = 1$ for the single opponent yielding the lowest reward). Thus, Murphy gains no additional adversarial power from mixing, and finding the worst-case opponent over the convex hull collapses to simply argmin-ing over the discrete set.  
+Therefore, the minimizer is always achieved at a vertex (i.e., setting $\lambda_i = 1$ for the single opponent yielding the lowest reward). Thus, Murphy gains no additional adversarial power from mixing, and finding the worst-case opponent over the convex hull collapses to simply argmin-ing over the discrete set.
+
 ---
 
 ### Usage
