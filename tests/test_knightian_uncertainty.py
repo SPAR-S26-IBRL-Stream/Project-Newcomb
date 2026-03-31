@@ -368,3 +368,46 @@ class TestAgentBeliefsKwarg:
             probs = agent.get_probabilities()
             assert probs.shape == (2,)
             agent.update(probs, 0, Outcome(reward=1.0))
+
+
+# ── Cohomogeneity over many steps ────────────────────────────────────────
+
+class TestCohomogeneityLongRun:
+    """Test that lambda + b stays close to 1 with g=1 over many steps.
+
+    Uses asymmetric priors (pessimistic vs optimistic) on a single arm
+    to stress-test the update rule — similar to a real scenario where
+    beliefs disagree strongly.
+    """
+
+    def test_cohomogeneity_preserved_100_steps(self):
+        """lambda + offset should remain ~1 for all measures after 100 steps."""
+        num_actions = 1
+        pessimistic = BernoulliBelief(num_actions=num_actions)
+        pessimistic.alpha = np.array([1.0])
+        pessimistic.beta = np.array([3.0])  # mean=0.25
+
+        optimistic = BernoulliBelief(num_actions=num_actions)
+        optimistic.alpha = np.array([3.0])
+        optimistic.beta = np.array([1.0])  # mean=0.75
+
+        infradist = Infradistribution([
+            AMeasure(pessimistic),
+            AMeasure(optimistic),
+        ], g=1.0)
+
+        rng = np.random.default_rng(42)
+        max_drift = 0.0
+
+        for step in range(100):
+            reward = float(rng.random() < 0.5)  # true p=0.5
+            infradist.update(action=0, outcome=Outcome(reward=reward))
+
+            for m in infradist.measures:
+                drift = abs(m.scale + m.offset - 1.0)
+                max_drift = max(max_drift, drift)
+
+        assert max_drift < 1e-3, (
+            f"cohomogeneity drift after 100 steps: {max_drift} "
+            f"(expected < 1e-3 for floating point only)"
+        )

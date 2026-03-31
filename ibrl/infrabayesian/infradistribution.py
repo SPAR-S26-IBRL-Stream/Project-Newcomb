@@ -1,4 +1,6 @@
 """Infradistribution — wraps AMeasure objects."""
+import warnings
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -21,6 +23,15 @@ class Infradistribution:
             raise ValueError("Must provide at least one measure")
         if not (0.0 <= g <= 1.0):
             raise ValueError(f"g must be in [0, 1], got {g}")
+        if 0.0 < g < 1.0:
+            warnings.warn(
+                f"g={g}: for 0 < g < 1, individual a-measure cohomogeneity (λ+b ≤ 1) "
+                f"is not preserved by Definition 11 for non-worst-case measures. "
+                f"Offsets compound exponentially, causing numerical blowup over many "
+                f"steps. The infradistribution's lower envelope remains valid, but "
+                f"results may degrade. Use g=1 (default) for stable behavior.",
+                stacklevel=2,
+            )
         self.measures = measures
         self.g = g
 
@@ -54,7 +65,10 @@ class Infradistribution:
             # (2) Scale update — rescale by P_k(obs), normalize
             m.scale = m.scale * obs_prob / normalization
 
-            # (3) Bayesian update — belief conditions on observation            
+            # (3) TODO: Enforce cohomogeneity: with g=1, λ+b=1 is an invariant
+            # that exact arithmetic preserves but floating point doesn't.
+
+            # (4) Bayesian update — belief conditions on observation
             m.belief.update(action, outcome)
 
     def evaluate(self) -> NDArray[np.float64]:
