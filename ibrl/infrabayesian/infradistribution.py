@@ -65,8 +65,11 @@ class Infradistribution:
             # (2) Scale update — rescale by P_k(obs), normalize
             m.scale = m.scale * obs_prob / normalization
 
-            # (3) TODO: Enforce cohomogeneity: with g=1, λ+b=1 is an invariant
+            # (3) Enforce cohomogeneity: with g=1, λ+b=1 is an invariant
             # that exact arithmetic preserves but floating point doesn't.
+            if float(self.g) == 1.0:
+                assert abs(m.scale + m.offset - 1) < 1e-12
+                m.scale = 1 - m.offset
 
             # (4) Bayesian update — belief conditions on observation
             m.belief.update(action, outcome)
@@ -86,3 +89,5 @@ class Infradistribution:
         """α_k(1 ★_L g) = λ · P(obs) + g · λ · P(not obs) + b"""
         return m.scale * obs_prob + self.g * m.scale * (1.0 - obs_prob) + m.offset
 
+    def __repr__(self) -> str:
+        return "[" + (",".join(str(m) for m in self.measures)) + "]"

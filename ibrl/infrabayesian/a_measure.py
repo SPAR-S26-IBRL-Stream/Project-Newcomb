@@ -23,3 +23,6 @@ class AMeasure:
     def evaluate(self) -> NDArray[np.float64]:
         """α(f) = λ · μ(f) + b"""
         return self.scale * self.belief.predict_rewards() + self.offset
+
+    def __repr__(self) -> str:
+        return f"({self.scale:.2f}*{self.belief},{self.offset:.2f})"
