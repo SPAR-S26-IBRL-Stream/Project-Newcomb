@@ -1,0 +1,4 @@
+# file: /home/zkmathquant/AIdev/spar26spring/Project-Newcomb-forked/ibrl/simulators/simulator.py
+# hypothesis_version: 6.151.9
+
+[101, 'actions', 'average_reward', 'num_actions', 'num_runs', 'num_steps', 'optimal_reward', 'probabilities', 'rewards', 'verbose']
