@@ -532,9 +532,18 @@ observation better.
    and counterfactual policy. For cumulative-reward bandits, what does this
    reduce to?
 
-3. **Does the vertex set need to grow?** The paper mentions that downward
-   closure may introduce new extremal points. Currently we only track the
-   initial vertices (an approximation). Monitor whether this causes issues.
+3. **Fixed vertex set vs. true infradistribution update**: Definition 11 is
+   defined on the infradistribution (a closed convex set of a-measures), not
+   on individual measures. Our implementation tracks a fixed list of vertices
+   and updates each one independently using the global normalization constants.
+   This works because the formula maps each (m, b) pair independently given
+   E_H, so updating vertices and taking the lower envelope gives the correct
+   updated infradistribution — *provided the vertex set is complete*. The
+   concern is that conditioning can introduce new extreme points via downward
+   closure. If that happens, our fixed set is an outer approximation: the min
+   over our vertices is ≥ the true min, making the agent less pessimistic than
+   it should be. Whether the vertex set needs to grow in practice, and how to
+   detect or correct this, is unresolved.
 
 4. **GaussianBelief KU support**: `compute_outcome_probability()` is not yet
    implemented for `GaussianBelief` — it needs an assumed noise variance.
@@ -544,13 +553,7 @@ observation better.
    with different priors be specified via `construction.py`? E.g.,
    `"infrabayesian:beliefs=bernoulli:3"` to create 3 vertices?
 
-6. **Fuzzy observations**: All current environments have crisp observation
-   indicators (L ∈ {0, 1}). The math already handles fuzzy L (L ∈ [0, 1]),
-   which would matter for noisy sensors, continuous outcomes with soft
-   likelihoods, or aggregated batch observations. Supporting this could
-   demonstrate IB's theoretical advantages over standard Bayesian conditioning.
-
-7. **Out-of-support observations and belief misspecification**: There is a
+6. **Out-of-support observations and belief misspecification**: There is a
    meaningful distinction between *unlikely* data (reward=1 when p=0.01 —
    handled fine, the belief just updates aggressively) and *out-of-support*
    data (reward=0.5 under a Bernoulli belief — the belief literally cannot
@@ -562,7 +565,7 @@ observation better.
    misspecified but another's isn't, should the misspecified one be removed
    from the infradistribution?
 
-8. **Utility mapping and [0,1] bounds**: IB theory requires functions in
+7. **Utility mapping and [0,1] bounds**: IB theory requires functions in
    [0,1], but environments like Newcomb produce rewards in [0,15]. A utility
    mapping parameter was previously implemented in the agent but removed
    because the abstraction was leaky — the belief didn't know whether it was
@@ -573,7 +576,7 @@ observation better.
    or using a wrapper/decorator pattern. Related: `predict_rewards()` is
    misleading if the belief has been trained on mapped utilities.
 
-9. **Explore-exploit tradeoffs**: IB theory prescribes how to update and plan
+8. **Explore-exploit tradeoffs**: IB theory prescribes how to update and plan
    under ambiguity, but is silent on exploration. Worst-case planning over
    multiple beliefs is *pessimistic* (avoid arms that could be bad), which is
    the opposite of UCB-style *optimism* (try arms that could be good). Does
@@ -582,7 +585,7 @@ observation better.
    exploration strategies (UCB, Thompson sampling) on top of the IB reward
    model?
 
-10. **0<g<1 causes cohomogeneity blowup in individual a-measures**: Definition
+9. **0<g<1 causes cohomogeneity blowup in individual a-measures**: Definition
     11 uses a global normalization (P^g_H(L) = min over all measures) rather
     than per-measure normalization. With g=1 all measures have the same full
     value (λ+b=1 → α(1★_L 1)=1), so the global normalization works perfectly.
@@ -596,7 +599,7 @@ observation better.
     (b) periodic clamping/projection (not theoretically justified), (c) pruning
     irrelevant measures whose floor exceeds others' max, (d) restrict to g=1.
 
-11. **Should updates account for action selection probability?** The
+10. **Should updates account for action selection probability?** The
     `probabilities` argument is passed to `agent.update()` but ignored by
     almost every agent (including IB). In contextual bandits, inverse
     propensity weighting (IPW) corrects for the fact that rarely-chosen arms
