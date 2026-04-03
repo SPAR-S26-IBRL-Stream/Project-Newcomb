@@ -2,6 +2,8 @@ from abc import ABC,abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 
+from ..outcome import Outcome
+
 
 class BaseAgent(ABC):
     """
@@ -21,7 +23,7 @@ class BaseAgent(ABC):
         Initialise permanent state
         Must call reset() before initial interaction with environment
         """
-        assert isinstance(num_actions,int) and num_actions >= 2
+        assert isinstance(num_actions,int) and num_actions >= 1
         self.num_actions = num_actions
         self.seed = seed
         self.verbose = verbose
@@ -34,14 +36,14 @@ class BaseAgent(ABC):
         """
         pass
 
-    def update(self, probabilities : NDArray[np.float64], action : int, reward : float) -> None:
+    def update(self, probabilities : NDArray[np.float64], action : int, outcome : Outcome) -> None:
         """
         Update internal state based on outcome of the episode
 
         Arguments:
             probabilities: The probability distribution over actions given by the agent
             action:        The action that was selected from the probability distribution
-            reward:        The reward received
+            outcome:       The full outcome (reward + env_action)
         """
         self.step += 1
 
