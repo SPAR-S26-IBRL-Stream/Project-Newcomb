@@ -22,8 +22,9 @@ class QLearningAgent(BaseGreedyAgent):
     def get_probabilities(self) -> NDArray[np.float64]:
         return self.build_greedy_policy(self.q)
 
-    def update(self, probabilities : NDArray[np.float64], action : int, reward : float):
-        super().update(probabilities, action, reward)
+    def update(self, probabilities, action, outcome):
+        super().update(probabilities, action, outcome)
+        reward = outcome.reward
         if self.learning_rate is None:
             # sample average
             self.counts[action] += 1

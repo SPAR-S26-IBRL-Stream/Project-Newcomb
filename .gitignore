@@ -45,6 +45,15 @@ experiments/**/checkpoints/
 results/*
 !results/.gitkeep
 
+# Claude Code
+.claude/
+
+# Jupyter virtual documents
+.virtual_documents/
+
+# Vim undo
+*.un~
+
 # Misc
 *.pyc
 .env
