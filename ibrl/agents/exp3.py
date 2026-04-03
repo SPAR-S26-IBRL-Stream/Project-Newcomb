@@ -25,8 +25,9 @@ class EXP3Agent(BaseAgent):
     def get_probabilities(self):
         return self.probs
 
-    def update(self, probabilities : NDArray[np.float64], action : int, reward : float):
-        super().update(probabilities, action, reward)
+    def update(self, probabilities, action, outcome):
+        super().update(probabilities, action, outcome)
+        reward = outcome.reward
 
         # 1. Internal scaling ensures the math stays in the [0, 1] 'safe zone'
         scaled_reward = reward / self.max_reward

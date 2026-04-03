@@ -53,8 +53,9 @@ class ExperimentalAgent2(BaseGreedyAgent):
             p0 = max(strategies, key=lambda strategy: strategy[1])[0]
             return np.array([p0, 1-p0], dtype=np.float64)
 
-    def update(self, probabilities : NDArray[np.float64], action : int, reward : float):
-        super().update(probabilities, action, reward)
+    def update(self, probabilities, action, outcome):
+        super().update(probabilities, action, outcome)
+        reward = outcome.reward
         prediction = probabilities.argmax()
         # only update action for which distribution is strongly peaked,
         # i.e. when we can be fairly certain that the predictor chose this action

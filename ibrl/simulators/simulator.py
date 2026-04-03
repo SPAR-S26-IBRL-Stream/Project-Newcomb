@@ -48,11 +48,11 @@ def simulate(
         optimal_reward += env.get_optimal_reward()
         for step in range(num_steps):
             probabilities = agent.get_probabilities()
-            env.predict(probabilities)
             action = sample_action(agent.random, probabilities)
-            reward = env.interact(action)
-            agent.update(probabilities, action, reward)
+            outcome = env.step(probabilities, action)
+            agent.update(probabilities, action, outcome)
 
+            reward = outcome.reward
             average_reward[0, step] += reward
             average_reward[1, step] += reward**2
             all_probabilities[run, step, :] = probabilities

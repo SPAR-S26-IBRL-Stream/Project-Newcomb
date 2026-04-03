@@ -23,12 +23,11 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
         assert self.num_actions == len(reward_table)
         self.reward_table = np.array(reward_table)
 
-    def predict(self, probabilities : NDArray[np.float64]):
-        prediction = sample_action(self.random, probabilities)
-        self.rewards = self.reward_table[prediction,:]
+    def _respond(self, probabilities : NDArray[np.float64]) -> int:
+        return sample_action(self.random, probabilities)
 
-    def interact(self, action : int) -> float:
-        return self.rewards[action]
+    def _resolve(self, env_action : int, action : int) -> float:
+        return self.reward_table[env_action, action]
 
     def get_optimal_reward(self) -> float:
         # Compute the optimal reward, based on the full reward table
