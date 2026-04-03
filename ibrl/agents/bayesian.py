@@ -16,8 +16,9 @@ class BayesianAgent(BaseGreedyAgent):
     def get_probabilities(self) -> NDArray[np.float64]:
         return self.build_greedy_policy(self.values)
 
-    def update(self, probabilities : NDArray[np.float64], action : int, reward : float):
-        super().update(probabilities, action, reward)
+    def update(self, probabilities, action, outcome):
+        super().update(probabilities, action, outcome)
+        reward = outcome.reward
         # Estimate reward of the action and its uncertainty based on observed reward and priors
         # Define precision, tau, as 1/sigma^2 to avoid vanishing sigma precision issues
         self.values[action] = (self.precision[action] * self.values[action] + reward) / (self.precision[action] + 1.0)
