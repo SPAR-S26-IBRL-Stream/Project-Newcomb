@@ -21,14 +21,17 @@ class TestNewcombEnvironment:
 
     def test_predict_sets_rewards(self, newcomb_env):
         probs = np.array([1.0, 0.0])
-        newcomb_env.predict(probs)
-        assert hasattr(newcomb_env, 'rewards')
-        assert newcomb_env.rewards.shape == (2,)
+        action = 0
+        outcome = newcomb_env.step(probs, action)
+        # After step(), the environment has executed _respond() which samples a prediction
+        # Just verify the outcome is valid
+        assert isinstance(outcome.reward, (int, float, np.integer, np.floating))
 
     def test_interact(self, newcomb_env):
         probs = np.array([1.0, 0.0])
-        newcomb_env.predict(probs)
-        reward = newcomb_env.interact(0)
+        action = 0
+        outcome = newcomb_env.step(probs, action)
+        reward = outcome.reward
         assert isinstance(reward, (int, float, np.integer, np.floating))
         assert reward in [0, 5, 10, 15]
 

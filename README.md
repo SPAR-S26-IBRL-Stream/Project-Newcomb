@@ -121,6 +121,14 @@ Timeout protection - Prevents hanging tests
 
 ## Test manual
 
+In BRIEF
+```
+uv sync --extra test
+uv run pytest --cov=ibrl --cov-report=term-missing
+```
+
+
+
 ```
 # Install test dependencies
 uv sync --extra test
@@ -145,8 +153,5 @@ uv run pytest --cov=ibrl --cov-report=term-missing
 
 ```
 
-# To see the coverage report table:
-```
-explorer.exe htmlcov\index.html
-```
+
 

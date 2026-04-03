@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 from ibrl.agents import QLearningAgent, BayesianAgent, EXP3Agent
+from ibrl.outcome import Outcome
+
 
 
 class TestQLearningAgent:
@@ -25,7 +27,8 @@ class TestQLearningAgent:
         probs = q_learning_agent.get_probabilities()
         action = 0
         reward = 1.0
-        q_learning_agent.update(probs, action, reward)
+        outcome = Outcome(reward=reward, env_action=None)
+        q_learning_agent.update(probs, action, outcome)
         assert q_learning_agent.step == 2
         assert q_learning_agent.q[action] > 0
 
@@ -55,7 +58,8 @@ class TestBayesianAgent:
     def test_update_increases_precision(self, bayesian_agent):
         initial_precision = bayesian_agent.precision.copy()
         probs = bayesian_agent.get_probabilities()
-        bayesian_agent.update(probs, 0, 1.0)
+        outcome = Outcome(reward=1.0, env_action=None)
+        bayesian_agent.update(probs, 0, outcome)
         assert bayesian_agent.precision[0] > initial_precision[0]
 
 
@@ -79,5 +83,6 @@ class TestEXP3Agent:
     def test_update_changes_weights(self, exp3_agent):
         initial_weights = exp3_agent.log_weights.copy()
         probs = exp3_agent.get_probabilities()
-        exp3_agent.update(probs, 0, 1.0)
+        outcome = Outcome(reward=1.0, env_action=None)
+        exp3_agent.update(probs, 0, outcome)
         assert not np.allclose(exp3_agent.log_weights, initial_weights)
