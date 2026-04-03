@@ -29,7 +29,7 @@ class BaseEnvironment(ABC):
         Initialise permanent state
         Must call reset() before initial interaction with agent
         """
-        assert isinstance(num_actions,int) and num_actions >= 2
+        assert isinstance(num_actions,int) and num_actions >= 1
         self.num_actions = num_actions
         self.num_steps = num_steps
         self.num_runs = num_runs
