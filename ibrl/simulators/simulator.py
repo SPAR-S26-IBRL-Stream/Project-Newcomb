@@ -60,7 +60,7 @@ def simulate(
             rewards[run, step] = reward
 
             if verbose > 0:
-                print(f"Step:{step:5d}; Action:{action:2d}; Reward:{reward:6.2f}; Probabilities: {dump_array(probabilities)}; Agent state: {agent.dump_state()}")
+                print(f"Step:{step:5d}; A={action:2d}; R={reward:6.2f}; P(A)={dump_array(probabilities)}; Agent state: {agent.dump_state()}")
 
     average_reward /= num_runs
     optimal_reward /= num_runs

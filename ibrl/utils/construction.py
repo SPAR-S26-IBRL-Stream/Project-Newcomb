@@ -1,5 +1,6 @@
 from .. import agents
 from .. import environments
+from ..infrabayesian.beliefs import BernoulliBelief, GaussianBelief, NewcombLikeBelief
 
 
 def parse_argument_string(string : str) -> tuple[str, dict[str, float]]:
@@ -29,7 +30,10 @@ def parse_argument_string(string : str) -> tuple[str, dict[str, float]]:
     for arg in args_str.split(","):
         arg_name,arg_val = arg.split("=",1)
         if ":" not in arg_val:
-            args_dict[arg_name] = float(arg_val)
+            try:
+                args_dict[arg_name] = float(arg_val)
+            except ValueError:
+                args_dict[arg_name] = arg_val
         else:
             args_dict[arg_name] = tuple(map(float, arg_val.split(":")))
     return name, args_dict
@@ -57,7 +61,14 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
         "exp3":          agents.EXP3Agent,
         "experimental1": agents.ExperimentalAgent1,
         "experimental2": agents.ExperimentalAgent2,
-        "experimental3": agents.ExperimentalAgent3
+        "experimental3": agents.ExperimentalAgent3,
+        "infrabayesian":  agents.InfraBayesianAgent,
+    }
+
+    belief_types = {
+        "bernoulli": lambda num_actions, **kw: BernoulliBelief(num_actions),
+        "gaussian":  lambda num_actions, **kw: GaussianBelief(num_actions),
+        "newcomb":   lambda num_actions, **kw: NewcombLikeBelief(num_actions),
     }
 
     name, kwargs = parse_argument_string(string)
@@ -70,6 +81,19 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
     arguments.pop("num_steps", None)  # These should not be accessible to the agent
     arguments.pop("num_runs", None)
     arguments["seed"] += seed_offset
+
+    # For infrabayesian agent, construct beliefs from string kwargs
+    if name == "infrabayesian":
+        num_act = arguments["num_actions"]
+        if "belief" in arguments:
+            # Single belief shorthand: belief=bernoulli -> beliefs=[BernoulliBelief(...)]
+            belief_name = arguments.pop("belief")
+            if belief_name not in belief_types:
+                raise RuntimeError("Invalid belief type: " + str(belief_name))
+            arguments["beliefs"] = [belief_types[belief_name](num_actions=num_act)]
+        elif "beliefs" not in arguments:
+            raise RuntimeError("infrabayesian agent requires belief= or beliefs= argument")
+
     return agent_types[name](**arguments)
 
 
@@ -93,6 +117,7 @@ def construct_environment(string : str, options : dict[str,int], seed_offset : i
 
     environment_types = {
         "bandit":              environments.BanditEnvironment,
+        "bernoulli-bandit":    environments.BernoulliBanditEnvironment,
         "switching":           environments.SwitchingAdversaryEnvironment,
         "newcomb":             environments.NewcombEnvironment,
         "damascus":            environments.DeathInDamascusEnvironment,
