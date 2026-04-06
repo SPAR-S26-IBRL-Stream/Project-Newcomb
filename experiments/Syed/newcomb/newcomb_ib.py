@@ -3,9 +3,11 @@ from pathlib import Path
 
 import numpy as np
 
+# This is a workaround for uv since ibrl is not exposed as a package via uv sync
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
 
 from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.newcomb import NewcombEnvironment as NewcombEnv
