@@ -153,5 +153,5 @@ uv run pytest --cov=ibrl --cov-report=term-missing
 
 ```
 
-
+or just push a commit and check github https://github.com/SPAR-S26-IBRL-Stream/Project-Newcomb/actions in a minute
 

@@ -64,3 +64,8 @@ wandb/
 # Hypothesis
 .hypothesis/
 coverage.xml
+
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/

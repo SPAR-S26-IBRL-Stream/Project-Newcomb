@@ -22,8 +22,9 @@ test = [
     "pytest-cov>=4.0",
 ]
 
-[tool.setuptools]
-packages = ["ibrl"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ibrl*"]
 
 [tool.setuptools.package-data]
 ibrl = ["py.typed"]

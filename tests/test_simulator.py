@@ -26,18 +26,3 @@ class TestSimulator:
         # Check values are valid
         assert np.all(np.isfinite(results["rewards"]))
         assert np.all(np.isfinite(results["average_reward"]))
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        

@@ -1,20 +1,17 @@
+
 """Tests for belief-based infrabayesian agent (Phase 3)."""
 import numpy as np
 import pytest
 
 from ibrl.outcome import Outcome
-from ibrl.infrabayesian.beliefs import (
-    BaseBelief, BernoulliBelief, GaussianBelief, NewcombLikeBelief,
-)
+from ibrl.infrabayesian.beliefs import BernoulliBelief, NewcombLikeBelief
 from ibrl.infrabayesian.a_measure import AMeasure
 from ibrl.infrabayesian.infradistribution import Infradistribution
 from ibrl.agents.infrabayesian import InfraBayesianAgent
-from ibrl.environments.bandit import BanditEnvironment
 from ibrl.environments.bernoulli_bandit import BernoulliBanditEnvironment
 from ibrl.environments.newcomb import NewcombEnvironment
-from ibrl.environments.switching import SwitchingAdversaryEnvironment
 from ibrl.simulators.simulator import simulate
-from ibrl.utils import sample_action
+
 
 
 # ── BernoulliBelief ─────────────────────────────────────────────────────────────
@@ -249,6 +246,5 @@ class TestSimulatorIntegration:
         assert results["rewards"].shape == (2, 50)
 
 
-# ── SwitchingAdversary Bernoulli fix ─────────────────────────────────────────
 
 
