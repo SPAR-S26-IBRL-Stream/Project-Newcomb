@@ -11,7 +11,7 @@ jobs:
     name: Smoke Tests (Round 1)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v2
       - run: uv sync --extra test
       - run: uv run pytest tests/test_smoke.py -v
@@ -20,7 +20,7 @@ jobs:
     name: Unit Tests (Round 2)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v2
       - run: uv sync --extra test
-      - run: uv run pytest tests/ -v --cov=ibrl --cov-report=term-missing
+      - run: uv run pytest tests/ -v --cov=ibrl --cov-report=term-missing --cov-fail-under=75

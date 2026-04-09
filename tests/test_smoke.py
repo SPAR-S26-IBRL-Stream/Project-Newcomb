@@ -6,7 +6,7 @@ from ibrl.environments import BanditEnvironment, NewcombEnvironment
 
 
 class TestSmokeTests:
-    """Run training for 10 seconds to verify nothing is obviously broken"""
+    """Quick validation that major agent/environment combinations don't crash."""
     
     @pytest.mark.timeout(15)
     def test_smoke_q_learning_bandit(self):
