@@ -60,3 +60,12 @@ results/*
 wandb/
 *.pkl
 *.pt
+
+# Hypothesis
+.hypothesis/
+coverage.xml
+
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
