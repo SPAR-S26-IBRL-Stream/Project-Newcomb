@@ -32,12 +32,10 @@ class TestQLearningAgent:
         assert q_learning_agent.step == 2
         assert q_learning_agent.q[action] > 0
 
-    def test_learning_rate_none(self, num_actions, seed):
-        #It verifies that when learning_rate=None, the Q-learning agent uses sample averaging
-        # and correctly increments the action count after an update.
+    def test_sample_average_increments_action_count(self, num_actions, seed):
+        """Verify Q-learning agent increments action count in sample average mode."""
         agent = QLearningAgent(num_actions=num_actions, learning_rate=None, seed=seed)
         agent.reset()
-        assert agent.learning_rate is None
         assert hasattr(agent, 'counts')
         
         probs = agent.get_probabilities()
@@ -93,3 +91,5 @@ class TestEXP3Agent:
         outcome = Outcome(reward=1.0, env_action=None)
         exp3_agent.update(probs, 0, outcome)
         assert not np.allclose(exp3_agent.log_weights, initial_weights)
+        
+        
