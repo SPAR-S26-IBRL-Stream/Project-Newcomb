@@ -3,76 +3,58 @@ import numpy as np
 from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
-from ..infrabayesian.beliefs import BaseBelief
 from ..infrabayesian.a_measure import AMeasure
 from ..infrabayesian.infradistribution import Infradistribution
 from ..utils import dump_array
 
 
 class InfraBayesianAgent(BaseGreedyAgent):
-    """Agent using infrabayesian inference.
-
-    Initialized with beliefs (list of epistemic models), not an environment.
-    A single-element list gives non-KU (standard Bayesian) behavior;
-    multiple elements give Knightian uncertainty.
-
-    get_probabilities() has two phases:
-      1. MODEL: ask infradist to evaluate the reward function
-      2. PLAN: solve for the best policy given that structure
-
-    update() has one phase:
-      1. MODEL: pass observation to infradist to update beliefs
-
-    Only InfraBayesianAgent uses AMeasure/Infradistribution/Belief.
-    Other agents are unaffected.
     """
+    Agent using infrabayesian inference
+    This is intended for environments two discrete outcomes, with rewards 0 and 1.
+    The structure could easily be extended to more outcomes and different rewards.
 
-    def __init__(self, *args, beliefs: list[BaseBelief],
-                 g: float = 1.0, **kwargs):
+    For each action, the agent maintains an mixed infradistribution, which corresponds to a classical distribution
+    over (non-mixed) infradistributions, where each infradistribution represents a hypothesis.
+
+    Each non-mixed infradistribution can contain either a single a-measure, in which case it represents a concrete
+    possible world, or multiple a-measures, in which case it represents Knightian Uncertainty between those worlds.
+
+    By default, non-mixed infradistributions are initialised uniformly in the interval [0,1] (reward probabilities)
+    Mixed infradistributions are initialised to uniform priors of the non-mixed ones without KU.
+    This corresponds to the DiscreteBayesianAgent.
+    """
+    def __init__(self, *args,
+            num_hypotheses : int = 5,
+            **kwargs):
         super().__init__(*args, **kwargs)
-        if not isinstance(beliefs, list) or len(beliefs) == 0:
-            raise ValueError("beliefs must be a non-empty list of BaseBelief")
-        self._belief_templates = beliefs
-        self._g = g
+        self.num_hypotheses = num_hypotheses
+        self.hypotheses = np.stack([                    # shape (num_hypotheses,num_outcomes=2)
+            np.linspace(1., 0., self.num_hypotheses),   # probability of outcome 0
+            np.linspace(0., 1., self.num_hypotheses)    # probability of outcome 1
+        ],axis=-1)
+        self.reward_function = np.array([0.,1.])        # reward per outcome
 
     def reset(self):
         super().reset()
-        measures = [AMeasure(b.copy()) for b in self._belief_templates]
-        self.infradist = Infradistribution(measures, g=self._g)
+        self.dists = []
+        for _ in range(self.num_actions):
+            coefficients = np.ones(self.num_hypotheses) / self.num_hypotheses
+            measure = AMeasure(self.hypotheses, coefficients)
+            self.dists.append(Infradistribution([measure]))
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
-        """MODEL phase: update beliefs with observation."""
         super().update(probabilities, action, outcome)
-        self.infradist.update(action, outcome)
+        assert outcome.outcome is not None
+
+        self.dists[action].update(self.reward_function, outcome.outcome)
 
     def get_probabilities(self) -> NDArray[np.float64]:
-        """MODEL then PLAN: get reward structure, solve for policy."""
-        # MODEL: evaluate the reward function under worst-case measure
-        reward_model = self.infradist.evaluate()
-
-        # PLAN: convert reward structure into a policy
-        if reward_model.ndim == 1:
-            values = reward_model
-        elif reward_model.ndim == 2:
-            # Heuristic: use diagonal (reward when predictor correctly predicts).
-            # TODO: proper game solving (find pi maximizing pi^T V pi)
-            values = self._solve_game(reward_model)
-        else:
-            raise ValueError(f"Unexpected reward model shape: {reward_model.shape}")
-
-        return self.build_greedy_policy(values)
-
-    def _solve_game(self, V: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Solve Newcomb-like game: return per-arm values for greedy policy.
-
-        Heuristic: return diagonal of V (expected reward when predictor
-        correctly predicts action). Proper game solving can be added later.
-        """
-        return np.diag(V)
+        expected_rewards = np.array([dist.expected_value(self.reward_function) for dist in self.dists])
+        return self.build_greedy_policy(expected_rewards)
 
     def dump_state(self) -> str:
-        # At higher verbosity level: print entire infradistribution
+        state = "["+",".join(dump_array(dist.history,"%d") for dist in self.dists)+"]"
         if self.verbose > 1:
-            return str(self.infradist)
-        model = self.infradist.evaluate()
-        return dump_array(model) if model.ndim == 1 else dump_array(np.diag(model))
+            state += ";" + repr(self.dists)
+        return state
