@@ -46,16 +46,57 @@ class AMeasure:
         coefficients:   1D array of c[j]
     """
     def __init__(self, probabilities : np.ndarray, coefficients : np.ndarray, scale : float = 1, offset : float = 0):
+        """
+        For clarity, prefer to use the constructors defined below
+        """
         self.num_components = probabilities.shape[0]
         self.num_outcomes = probabilities.shape[1]
         assert probabilities.shape == (self.num_components,self.num_outcomes)
         assert coefficients.shape  == (self.num_components,)
+        for i in range(self.num_components):
+            assert 0.999999 < probabilities[i].sum() < 1.000001
+        assert 0.999999 < coefficients.sum() < 1.000001
         assert offset >= 0
         assert scale > 0
         self.log_probabilities = np.log(np.maximum(probabilities,1e-300))  # avoid log(0)
         self.coefficients = coefficients
         self.scale = scale
         self.offset = offset
+
+    @classmethod
+    def pure(cls, probabilities : np.ndarray, scale : float = 1, offset : float = 0):
+        """
+        Initialise a pure a-measure, i.e. one that corresponds directly to a probability distribution over outcomes
+
+        Arguments:
+            probabilities:  array of shape (num_outcomes), probability of each outcome
+        """
+        assert probabilities.ndim == 1
+        return cls(
+            np.expand_dims(probabilities, axis=0),
+            np.ones(1),
+            scale,
+            offset
+        )
+
+    @classmethod
+    def mixed(cls, probabilities : np.ndarray, coefficients : np.ndarray, scale : float = 1, offset : float = 0):
+        """
+        Initialise a mixed a-measure, i.e. one that corresponds directly to a probability distribution over outcomes
+
+        Arguments:
+            probabilities:  array of shape (num_components,num_outcomes)
+                            probabilities[i] is the probability of each outcome under component i
+            coefficients:   array of shape (num_components), mixing coefficients
+        """
+        assert probabilities.ndim == 2
+        assert coefficients.ndim == 1
+        return cls(
+            probabilities,
+            coefficients,
+            scale,
+            offset
+        )
 
     def compute_probabilities(self, history : np.ndarray) -> np.ndarray:
         """

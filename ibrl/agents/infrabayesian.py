@@ -39,9 +39,15 @@ class InfraBayesianAgent(BaseGreedyAgent):
         super().reset()
         self.dists = []
         for _ in range(self.num_actions):
+            # Initialise hypotheses (infradistributions)
+            infradistributions = [
+                Infradistribution([AMeasure.pure(self.hypotheses[i])])
+                    for i in range(self.num_hypotheses)
+            ]
+            # Initialise prior (uniform distribution)
             coefficients = np.ones(self.num_hypotheses) / self.num_hypotheses
-            measure = AMeasure(self.hypotheses, coefficients)
-            self.dists.append(Infradistribution([measure]))
+            # Mix infradistributions
+            self.dists.append(Infradistribution.mix(infradistributions, coefficients))
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
         super().update(probabilities, action, outcome)
