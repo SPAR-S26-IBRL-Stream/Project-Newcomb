@@ -21,7 +21,7 @@ A prior represents classical uncertainty between hypotheses, e.g. "I think that 
 
 
 ## Design considerations
-Conceptually, an a-measure assigns a probability to all possible histories. Even when truncating histories, it is computationally infeasible to represent a-measures like this for any remotely realistic scenario. Another approach is needed to encode them in the code.
+Conceptually, an a-measure assigns a probability to all possible histories. Even when truncating histories, it is computationally infeasible to represent a-measures like this for any realistic scenario. Another approach is needed to encode them practically.
 
 Infradistributions are infinite sets of sa-measures. However, all of their behaviour is encoded in their minimal points, which is an infinite set of a-measures. Even more, we only need to consider the extremal minimal points. These are the points that are necessary to span the convex hull of the minimal points. This is a finite and usually not too large set of a-measures, so we expect that it is possible to store them explicitly.
 
@@ -33,38 +33,67 @@ The following discusses the architecture in the context a Bernoulli bandit, i.e.
 ### Discrete Bayesian agent
 Before we turn to the IB agent, we consider a naive Bayesian agent. This agent makes the key design concepts more visible and helps to understand the IB generalisation. This agent is implemented in `ibrl/agents/discrete_bayesian.py`.
 
-The agent operates in an environment with discrete outcomes, i.e. instead of a real-valued reward, the agent receives an integer, representing a discrete observation. It has a utility function (`self.reward_function`) that assigns to each outcome a real-valued reward in `[0,1]`.
-
-The agent further has an array `self.hypotheses` of shape `(num_hypotheses,num_outcomes)`. The entry `hypotheses(h,o)` is the probability of outcome `o` happening under hypothesis `h` and `Σ_o hypotheses(h,o) = 1` for all `h`.
-
-The agent maintains a set of distributions over hypotheses, `self.prior` of shape `(num_actions,num_hypotheses)`. For each action, this represents the probability that the agent assigns to each hypothesis. These distributions are initialised uniformly. As the agent learns, only this distribution gets updated.
-
-When making a decision, the agent uses the prior and the hypotheses to determine expected rewards of each action and then takes the action that maximises it.
+1. The agent operates in an environment with discrete outcomes, i.e. instead of a real-valued reward, the agent receives an integer, representing a discrete observation. It has a utility function that assigns to each outcome a real-valued reward in $[0,1]$.
+2. The agent further has an array `hypotheses` of shape `(num_hypotheses,num_outcomes)`. The entry `hypotheses[h,o]` is the probability of outcome `o` happening under hypothesis `h` and `Σ_o hypotheses[h,o] = 1` for all `h`.
+3. The agent maintains a set of distributions over hypotheses, `prior`, of shape `(num_actions,num_hypotheses)`. For each action, this represents the probability that the agent assigns to each hypothesis. These distributions are initialised uniformly. As the agent learns, only this distribution gets updated.
+4. When making a decision, the agent uses the prior and the hypotheses to determine expected rewards of each action and then takes the action that maximises it. It uses an ε-greedy policy to encourage exploration.
 
 ### Infrabayesian agent
-The IB agent differs from the discrete Bayesian in the following ways:
+In the **classical mode** of operation (i.e. without KU), the IB agent differs from the discrete Bayesian in the following ways:
 
-- instead of a prior distribution over hypothesis it maintains a mixed infradistribution for each action; instead of a classical update, we use the IB update rule
-- expected rewards are computed using the infra-expected values; the hypotheses array is only used to initialise the infradistributions
+1. The agent operates on the same discrete outcomes as the classical agent. It uses the same concept of a reward function.
+2. The agent has the same array `hypotheses` that the classical agent uses, though it has a slightly different meaning. For the classical agent, this array actually represents the hypotheses of the agent throughout its operation. It gets used during the update and to compute expectation values. For the IB agent, the `hypotheses` array is used only to initialise the infradistribution(s), which are now the objects that represent hypotheses. Updates and and expectation values are computed only from the infradistributions and do not need this array. These individual infradistributions are then mixed according to a uniform prior.
+3. The mixed infradistribution replaces the classical `prior`. Just like the classical agent had one prior for each action, the IB agent has one infradistribution for each action. These infradistributions are completely independent from each other. Learning happens by updating the infradistribution of the selected action. The IB update rule replaces the classical update rule.
+4. When making a decision, the agent compute the infra-expected value of each action and takes the action that maximises it. Like the classical agent, it uses an ε-greedy policy to encourage exploration.
 
-Learning happens via updates to the infradistribution.
+It was validated that the IB agent exactly reproduces the classical agent, when initialised in this way. See `experiments/fllor2/ib_validate_classical.ipynb` for details.
 
-**TODO: describe this more**
+In **IB mode**, we replace the second step of the initialisation above. We can use arbitrary combinations of classical priors and KU.
+
+**TODO: describe IB mode** in particular we should be able to have: classical prior, no KU; no prior, only KU; prior over KU; KU over priors; nested priors+KU
 
 
 ### A-measures
-Conceptually, an a-measure `(λμ,b)` consists of a scale `λ>0`, an offset `b≥0` and a probability measure `μ : X → [0,1]`. The space `X` is the set of all possible histories of some fixed length `N`, i.e. `X = O^N`.
+Conceptually, an a-measure $(λμ,b)$ consists of a scale $λ>0$, an offset $b≥0$ and a probability measure $μ : X → [0,1]$. The space $X$ is the set of all possible histories $h$ of some fixed length $N$, i.e. $X = \{h : h ∈ O^N\}$. For simplicity, the following description focuses on the bandit case, i.e. $O = \{$no reward, reward$\}$. The framework and code work for general finite outcome sets.
 
-We can construct the probability measure from a reward probability. Say the probability of getting a reward is `p`. For a history in which we got a reward `A` times and did not get a reward `B` times, the probability of that history is `p^A (1-p)^B`. Applying this to all histories of length `N`, we can construct the full measure.
+We call a **pure measure** one that corresponds to a definite reward probability $p$. In this case, we can easily construct the probability measure. For a history in which we got a reward $A$ times and did not get a reward $B$ times, the probability of that history is $p^A (1-p)^B$. Applying this to all histories of length $N$, we can obtain the full measure.
 
-We can mix a-measure by taking linear combinations `c1 (λ1 μ1,b1) + c2 (λ2 μ2,b2) = (c1 λ1 μ1 + c2 λ2 μ2, b1 + b2)`. Note that a mixed a-measure no longer corresponds to a single reward probability `p`. By mixing we lose information about which probabilities and mixing coefficients were used. In particular, we lose the ability to extend histories later on. Therefore we need to pick `N` large enough to encompass the entire lifetime of the agent.
+A **mixed measure** is a linear combination of pure measures, i.e. $Σ_i c_i μ_i$. Note that a mixed measure no longer corresponds to a definite reward probability $p$. By mixing we lose information about which probabilities and mixing coefficients were used.
 
-As described, the computational complexity of this procedure scales exponentially with the history length. The actual code parametrises measures in a such way that components can be constructed on-the-fly in constant time. Effectively, we only write out those histories that actually matter. See `ibrl/infrabayesian/a_measure.py` for implementation details. Conceptually, this approach is equivalent to mapping out all the histories for some very large `N`, as described above. 
+As described, the computational complexity of this procedure scales exponentially with the history length. The actual code parametrises measures in a such way that components can be constructed on-the-fly in constant time. Effectively, we only write out those histories that actually matter. The idea is to store the probabilities of the pure measures and the mixing coefficients to construct elements of the measure at greater depths as needed. See `ibrl/infrabayesian/a_measure.py` for implementation details. Conceptually, this approach is equivalent to mapping out all the histories for some very large $N$, as described above. 
 
-**TODO: describe IB update rule** The a-measure implementation changes the form of the update rule a bit
+The actual `AMeasure` object in the code maintains only the fixed values $(λμ,b)$. The object does not get updated during learning. It only provides a method to compute the probability distribution $p(o|h)$ over outcomes $o$ given some observed history $h$. In particular
 
-**TODO: implement mixture properly**: Right now, the code creates mixed a-measures and initialises a single infradistribution from them. Conceptually, it should create multiple infradistributions and then mix them (at least when reproducing the classical agent). We might want both functionalities in the end.
+$$p(o|h) = \frac{μ(h + o)}{μ(h)}$$
 
+Where $h+o$ means appending observation $o$ to history $h$. In the code, histories are encoded as integer arrays that indicate how often each outcome has occurred (the numbers $A$ and $B$ in the above example).
 
-See `experiments/fllor2/ibtest.ipynb` for validation that the IB agent, when initialised similar to the classical agent, exactly reproduces the classical agent.
+The expectation value of the a-measure under a given reward function $f$ and for a given history $h$ is then computed as:
 
+$$a(f|h) = λ \sum_o p(o|h) f(o) + b$$
+
+In the code, we can construct pure a-measures using `AMeasure.pure(p,λ,b)` where `p`=$p(o)$ is a probability distribution over outcomes. Mixed a-measures are constructed `AMeasure.mixed(ps,cs,λ,b)`, where `ps`=$p_i(o)$ is a set of probability distributions and `cs`=$c_i$ are the associated mixing coefficients.
+
+### Infradistributions
+Infradistributions are represented by their extremal minimal points. The `Infradistribution` object also stores the `history` observed so far (integer array, see above).
+
+The infra-expected value $E_H[f]$ of an infradistribution $H$ and reward function $f$ is computed as
+$$E_H[f] = \min_{a ∈ H} a(f|h)$$
+using the history $h$ stored in the object.
+
+The [IB update rule](https://www.lesswrong.com/posts/YAa4qcMyoucRS2Ykr/basic-inframeasure-theory#Definition_11__Updating) reads for each a-measure
+$$(λμ,b) → (λμ L, b + λμ(0 ★^L g)) → \frac{(λμ L, b + λμ(0 ★^L g) - E_H[0 ★^L g])}{E_H[1 ★^L g] - E_H[0 ★^L g]}$$
+where $L$ indicates the observed event, $g$ is the reward function and $f ★^L g = Lf + (1-L)g$ is the gluing operator. The first arrow is the raw update and the second arrow is the renormalisation step. The raw update truncates the probability measure to the observed branch of history ($λμL$) adds the off-history reward to the offset term ($b+λμ$). The renormalisation step ensures that $E_H[0] = 0$ and $E_H[1] = 1$.
+
+Most of these steps work as written. Only the truncation step requires some attention due to the way that measures are encoded. As described above, a-measures merely evaluate probabilities/expectation values given a certain history. Therefore, truncating the measure is equivalent to extending that history. Probabilities are computed for all possible events starting from a given history. For a longer history, some parts of these observations have already been excluded, so the measure is effectively truncated. In code, the truncation step looks like this:
+```python
+# Infradistribution.update
+for a_measure in a_measures:
+    a_measure.scale *= a_measure.probabilities(h)[o]
+h[o] += 1
+```
+First, we multiply the scale λ by $p(o|h)$. Since the probability measure is always normalised, we need to keep track of the probability of the current measure. This happens for every a-measure separately. Then we update the history object that is stored in the infradistribution. Note that this must happen after updating the scales, since otherwise we would be updating with $p(o|h+o)$.
+
+We can compute **mixtures of infradistributions**, by mixing their a-measures. This step is somewhat more involved that the mixture of a-measures described above, because infradistributions might contain multiple a-measures and these a-measures might themselves already be mixtures. Infradistribution mixtures are computed by taking all combinations of exactly one a-measure from each input infradistributions. If these are mixed a-measures, they are split into pure a-measures. All of these pure a-measures are then combined into a single mixed a-measure, while taking into account both the mixing coefficients of the original mixed a-measures and the mixing coefficients of the infradistribution mixture. See `Infradistribution.mix` for details.
+
+In the code, infradistributions can be constructed from a list of a-measures as `Infradistribution(list_of_measures)` or as a mixture of infradistributions as `Infradistribution.mix(list_of_infradistributions, mixing_coefficients)`.
