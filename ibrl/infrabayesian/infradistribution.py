@@ -20,6 +20,7 @@ class Infradistribution:
     I.e. we only keep track of the boundaries of the convex hull of minimal points
     """
     def __init__(self, measures : list[AMeasure]):
+        assert isinstance(measures, list)
         assert len(measures) > 0
         self.measures = measures
         # Store number of occurrences of each outcome
@@ -28,7 +29,7 @@ class Infradistribution:
     @classmethod
     def mix(cls, components : list[Infradistribution], coefficients : np.ndarray):
         """
-        Initialise an mixed infradistribution as the linear combination of several infradistributions.
+        Initialise a mixed infradistribution as the linear combination of several infradistributions.
         This method handles the case where some infradistributions might have multiple a-measures and
         where some of the a-measures might already be mixtures themselves.
         """
@@ -50,6 +51,23 @@ class Infradistribution:
             mix_coefficients = np.concatenate([measure.coefficients*coefficients[i] for i,measure in enumerate(measures)])
             new_measures.append(AMeasure.mixed(mix_probabilities,mix_coefficients))
         return cls(new_measures)
+
+    @classmethod
+    def mixKU(cls, components : list[Infradistribution]):
+        """
+        Initialise an infradistribution as having Knightian Uncertainty between several infradistributions.
+        """
+        # Make sure that infradistributions are unused
+        # Mixing used infradistributions would be more complicated
+        for component in components:
+            assert component.history.sum() == 0
+            for measure in component.measures:
+                assert measure.scale == 1.
+                assert measure.offset == 0.
+                assert measure.num_outcomes == components[0].measures[0].num_outcomes
+
+        return cls(sum((component.measures for component in components), start=[]))
+
 
     def expected_value(self, reward_function : np.ndarray) -> float:
         """
