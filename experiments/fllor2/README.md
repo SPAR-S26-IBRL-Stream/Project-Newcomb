@@ -53,7 +53,7 @@ Before turning to the true IB behaviour, it is helpful to explain the implementa
 
 
 ### A-measures
-Conceptually, an a-measure $(λμ,b)$ consists of a scale $λ>0$, an offset $b≥0$ and a probability measure $μ : X → [0,1]$. The space $X$ is the set of all possible histories $h$ of some fixed length $N$, i.e. $X = \{h : h ∈ O^N\}$, where $O$ is the set of outcomes. Note that since we use an independent infradistribution for each action, these histories only include observations, which is different from the usual definition of a history that includes also actions. For simplicity, the following description focuses on the bandit case, i.e. $O = \{$no reward, reward$\}$. The framework and code work for general finite outcome sets.
+Conceptually, an a-measure $(λμ,b)$ consists of a scale $λ>0$, an offset $b≥0$ and a probability measure $μ : X → [0,1]$. The space $X$ is the set of all possible histories $h$ of some fixed length $N$, i.e. $X = \lbrace h : h ∈ O^N \rbrace$, where $O$ is the set of outcomes. Note that since we use an independent infradistribution for each action, these histories only include observations, which is different from the usual definition of a history that includes also actions. For simplicity, the following description focuses on the bandit case, i.e. $O = \lbrace \text{no reward}, \text{reward} \rbrace$. The framework and code work for general finite outcome sets.
 
 We call a **pure measure** one that corresponds to a definite reward probability $p$. In this case, we can easily construct the probability measure. For a history in which we got a reward $A$ times and did not get a reward $B$ times, the probability of that history is $p^A (1-p)^B$. Applying this to all histories of length $N$, we obtain the full measure.
 
@@ -71,17 +71,21 @@ The expectation value of the a-measure under a given reward function $f$ and for
 
 $$a(f|h) = λ \sum_o p(o|h) f(o) + b$$
 
-In the code, we can construct pure a-measures using `AMeasure.pure(p,λ,b)` where `p`=$p(o)$ is a probability distribution over outcomes. Mixed a-measures are constructed as `AMeasure.mixed(ps,cs,λ,b)`, where `ps`=$p_i(o)$ is a set of probability distributions and `cs`=$c_i$ are the associated mixing coefficients.
+In the code, we can construct pure a-measures using `AMeasure.pure(p,λ,b)` where `p`= $p(o)$ is a probability distribution over outcomes. Mixed a-measures are constructed as `AMeasure.mixed(ps,cs,λ,b)`, where `ps`= $p_i(o)$ is a set of probability distributions and `cs`= $c_i$ are the associated mixing coefficients.
 
 ### Infradistributions
 Infradistributions are represented by their extremal minimal points. The `Infradistribution` object also stores the `history` observed so far (as an integer array, see above).
 
 The infra-expected value $E_H[f]$ of an infradistribution $H$ and reward function $f$ is computed as
+
 $$E_H[f] = \min_{a ∈ H} a(f|h)$$
+
 using the history $h$ stored in the object.
 
 The [IB update rule](https://www.lesswrong.com/posts/YAa4qcMyoucRS2Ykr/basic-inframeasure-theory#Definition_11__Updating) reads for each a-measure
+
 $$(λμ,b) → (λμ L, b + λμ(0 ★^L g)) → \frac{(λμ L, b + λμ(0 ★^L g) - E_H[0 ★^L g])}{E_H[1 ★^L g] - E_H[0 ★^L g]}$$
+
 where $L$ indicates the observed event, $g$ is the reward function and $f ★^L g = Lf + (1-L)g$ is the gluing operator. The first arrow is the raw update and the second arrow is the renormalisation step. The raw update truncates the probability measure to the observed branch of history ($λμL$) adds the off-history reward to the offset term ($b+λμ$). The renormalisation step ensures that $E_H[0] = 0$ and $E_H[1] = 1$.
 
 Most of these steps work as written. Only the truncation step requires some attention due to the way that measures are encoded. As described above, a-measures merely evaluate probabilities/expectation values given a certain history. Therefore, truncating the measure is equivalent to extending that history. Probabilities are computed for all possible events starting from a given history. For a longer history, some parts of these observations have already been excluded, so the measure is effectively truncated. In code, the truncation step looks like this:
