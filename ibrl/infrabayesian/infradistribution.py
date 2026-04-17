@@ -1,4 +1,5 @@
 """Infradistribution — wraps AMeasure objects."""
+from __future__ import annotations
 import itertools
 import numpy as np
 
@@ -38,17 +39,20 @@ class Infradistribution:
         for component in components:
             assert component.history.sum() == 0
             for measure in component.measures:
-                assert measure.scale == 1.
-                assert measure.offset == 0.
+                assert np.isclose(measure.scale, 1)
+                assert np.isclose(measure.offset, 0)
                 assert measure.num_outcomes == components[0].measures[0].num_outcomes
 
         new_measures = []
+        assert np.isclose(coefficients.sum(), 1)
+
         # Iterate over all possible combinations of exactly one a-measure from each infradistribution
         for measures in itertools.product(*(component.measures for component in components)):
             # Create mixed a-measure, by mixing all a-measures according to the mixing coefficients
             # Take care to handle the case where some of the a-measure are themselves mixtures
             mix_probabilities = np.exp(np.concatenate([measure.log_probabilities for measure in measures], axis=0))
             mix_coefficients = np.concatenate([measure.coefficients*coefficients[i] for i,measure in enumerate(measures)])
+            mix_coefficients /= mix_coefficients.sum()  # for numerics
             new_measures.append(AMeasure.mixed(mix_probabilities,mix_coefficients))
         return cls(new_measures)
 
@@ -62,8 +66,8 @@ class Infradistribution:
         for component in components:
             assert component.history.sum() == 0
             for measure in component.measures:
-                assert measure.scale == 1.
-                assert measure.offset == 0.
+                assert np.isclose(measure.scale, 1)
+                assert np.isclose(measure.offset, 0)
                 assert measure.num_outcomes == components[0].measures[0].num_outcomes
 
         return cls(sum((component.measures for component in components), start=[]))
@@ -86,7 +90,8 @@ class Infradistribution:
         glued1 = glue(1, event, reward_function)
         expect0 = self.expected_value(glued0)
         expect1 = self.expected_value(glued1)
-        prob = expect1 - expect0
+        probability = expect1 - expect0
+        assert probability > 0  # If probability==0, the measure should be removed (to it, nothing matters anymore)
         expect_m = [measure.expected_value(self.history, glued0) for measure in self.measures]
 
         # Raw update 1: Update history
@@ -97,13 +102,14 @@ class Infradistribution:
         self.history[event] += 1
 
         # Raw update 2: Add off-history reward to offset
+        # The measure evaluation includes the offset, so we do an assignment here, rather than an addition
         for i,measure in enumerate(self.measures):
-            measure.offset += expect_m[i]
+            measure.offset = expect_m[i]
 
         # Renormalisation
         for measure in self.measures:
             measure.offset -= expect0
-            measure /= prob
+            measure /= probability
 
     def __repr__(self) -> str:
         return repr(self.measures)

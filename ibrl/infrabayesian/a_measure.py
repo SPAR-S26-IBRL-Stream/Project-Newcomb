@@ -6,7 +6,7 @@ class AMeasure:
     An a-measure, characterised by
         a scale factor λ > 0
         a probability measure μ
-        an offset b > 0
+        an offset b >= 0
 
     The probability measure assigns a probability to all possible histories.
     This could be implemented by writing out all histories explicitly (up to some depth) and computing the
@@ -54,14 +54,14 @@ class AMeasure:
         assert probabilities.shape == (self.num_components,self.num_outcomes)
         assert coefficients.shape  == (self.num_components,)
         for i in range(self.num_components):
-            assert 0.999999 < probabilities[i].sum() < 1.000001
-        assert 0.999999 < coefficients.sum() < 1.000001
+            assert np.isclose(probabilities[i].sum(), 1)
+        assert np.isclose(coefficients.sum(), 1)
         assert offset >= 0
         assert scale > 0
         self.log_probabilities = np.log(np.maximum(probabilities,1e-300))  # avoid log(0)
         self.coefficients = coefficients
-        self.scale = scale
-        self.offset = offset
+        self.scale = np.float64(scale)
+        self.offset = np.float64(offset)
 
     @classmethod
     def pure(cls, probabilities : np.ndarray, scale : float = 1, offset : float = 0):
@@ -82,7 +82,7 @@ class AMeasure:
     @classmethod
     def mixed(cls, probabilities : np.ndarray, coefficients : np.ndarray, scale : float = 1, offset : float = 0):
         """
-        Initialise a mixed a-measure, i.e. one that corresponds directly to a probability distribution over outcomes
+        Initialise a mixed a-measure, i.e. a linear combination of pure measures
 
         Arguments:
             probabilities:  array of shape (num_components,num_outcomes)
@@ -108,6 +108,8 @@ class AMeasure:
         """
         # Log prob of current history, under each component. Shape (num_components,1)
         log_probs = np.expand_dims((self.log_probabilities*history).sum(axis=1),axis=1)
+        # Shift log probs for numerical stability
+        log_probs += log_probs.max()
         # Probability of immediately following histories, summed over components. Shape (num_outcomes,)
         probs = self.coefficients @ np.exp(log_probs + self.log_probabilities)
         # Normalise (divide by probability of reaching this point in history)
