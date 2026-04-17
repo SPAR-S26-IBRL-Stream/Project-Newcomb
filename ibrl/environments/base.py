@@ -51,11 +51,7 @@ class BaseEnvironment(ABC):
         """
         env_action = self._respond(probabilities)
         reward = self._resolve(env_action, action)
-        if isinstance(reward, tuple):
-            reward, outcome = reward
-        else:
-            outcome = None
-        return Outcome(reward=reward, outcome=outcome, env_action=env_action)
+        return Outcome(reward=reward, env_action=env_action)
 
     def _respond(self, probabilities : NDArray[np.float64]) -> int | None:
         """Environment's move given the agent's policy. Override in subclasses.
@@ -68,10 +64,6 @@ class BaseEnvironment(ABC):
     @abstractmethod
     def _resolve(self, env_action : int | None, action : int) -> float | tuple[float,int]:
         """Determine the reward given both moves. Override in subclasses.
-
-        Returns either of:
-            reward (float)
-            tuple of reward (float) and outcome (int), if environment has discrete outcomes
         """
         pass
 

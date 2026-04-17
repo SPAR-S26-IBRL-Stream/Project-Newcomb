@@ -32,10 +32,10 @@ class DiscreteBayesianAgent(BaseGreedyAgent):
 
     def update(self, probabilities, action, outcome):
         super().update(probabilities, action, outcome)
-        assert outcome.outcome is not None
+        observation = int(outcome.reward > 0.5)  # discretise reward
 
         # Bayesian update of prior
-        self.prior[action] *= self.hypotheses[:,outcome.outcome]
+        self.prior[action] *= self.hypotheses[:,observation]
         self.prior[action] /= self.prior[action].sum()
 
     def reset(self):

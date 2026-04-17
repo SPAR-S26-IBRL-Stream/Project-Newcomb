@@ -18,23 +18,23 @@ class AMeasure:
     The probability of outcome i occurring is p[i].
     Say we are at some point in history, where each outcome i has occurred o[i] times.
     The probability of arriving at this point is
-        (Σ_i p[i]^o[i])
+        (Π_i p[i]^o[i])
     The probability of the next outcome being k is
-        (Σ_i p[i]^o[i]) p[k]
+        (Π_i p[i]^o[i]) p[k]
     We divide by the probability of reaching this point to get the probability distribution over the next outcome:
-        (Σ_i p[i]^o[i]) p[k] / (Σ_i p[i]^o[i]) = p[k]
+        (Π_i p[i]^o[i]) p[k] / (Π_i p[i]^o[i]) = p[k]
     This simplification is expected and trivial for a pure measure.
 
     Now consider a mixed measure, i.e. one that is a linear combination of pure measures:
     We mix several pure measures with coefficients c[j].
     The pure measure j assigns probability p[j,i] to outcome i.
     Analogously to above, the probability of reaching a given point in history is
-        Σ_j c[j] Σ_i p[j,i]^o[i]
+        Σ_j c[j] Π_i p[j,i]^o[i]
     The probability of the next outcome being k is
-        Σ_j c[j] Σ_i p[j,i]^o[i] p[j,k]
+        Σ_j c[j] Π_i p[j,i]^o[i] p[j,k]
     And thus the probability distribution over the next outcome is
-        (Σ_j c[j] Σ_i p[j,i]^o[i] p[j,k]) / (Σ_j c[j] Σ_i p[j,i]^o[i])
-    
+        (Σ_j c[j] Π_i p[j,i]^o[i] p[j,k]) / (Σ_j c[j] Π_i p[j,i]^o[i])
+
     We no longer get the cancellation from the pure measure case, but the computational complexity is still
         O( #(pure measures) * #(outcomes) )
     rather than
@@ -115,11 +115,18 @@ class AMeasure:
         # Normalise (divide by probability of reaching this point in history)
         return probs / probs.sum()
 
-    def expected_value(self, history : np.ndarray, reward_function : np.ndarray) -> float:
+    def evaluate(self, history : np.ndarray, reward_function : np.ndarray) -> float:
         """
-        Compute the expected value of a given reward function, defined as λ*μ(f) + b
+        Compute the scaled and shifted expected value of a given reward function, defined as λ*μ(f) + b
         """
         return self.scale * (self.compute_probabilities(history) @ reward_function) + self.offset
+
+    def reset(self):
+        """
+        Reset internal state
+        """
+        self.scale = np.float64(1)
+        self.offset = np.float64(1)
 
     # Helper functions
 

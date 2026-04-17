@@ -6,15 +6,6 @@ import numpy as np
 from .a_measure import AMeasure
 
 
-def glue(value : float, event : int, reward_function : np.ndarray) -> np.ndarray:
-    """
-    Gluing operator: value *^event reward_function
-    """
-    reward_function = reward_function.copy()
-    reward_function[event] = value
-    return reward_function
-
-
 class Infradistribution:
     """
     An infradistribution, represented by it extremal minimal points
@@ -73,12 +64,12 @@ class Infradistribution:
         return cls(sum((component.measures for component in components), start=[]))
 
 
-    def expected_value(self, reward_function : np.ndarray) -> float:
+    def evaluate(self, reward_function : np.ndarray) -> float:
         """
-        Expected value over a given reward function
-        Defined as expected value minimum over all minimal points
+        Pessimistic expected value of a given reward function
+        Defined as minimal expected value over all minimal points
         """
-        return min(measure.expected_value(self.history, reward_function) for measure in self.measures)
+        return min(measure.evaluate(self.history, reward_function) for measure in self.measures)
 
     def update(self, reward_function : np.ndarray, event : int) -> None:
         """
@@ -86,13 +77,13 @@ class Infradistribution:
         This is Definition 11 from Basic Inframeasure Theory
         """
         # Expectation values (need to be computed before updating anything)
-        glued0 = glue(0, event, reward_function)
-        glued1 = glue(1, event, reward_function)
-        expect0 = self.expected_value(glued0)
-        expect1 = self.expected_value(glued1)
+        glued0 = Infradistribution._glue(0, event, reward_function)
+        glued1 = Infradistribution._glue(1, event, reward_function)
+        expect0 = self.evaluate(glued0)
+        expect1 = self.evaluate(glued1)
         probability = expect1 - expect0
         assert probability > 0  # If probability==0, the measure should be removed (to it, nothing matters anymore)
-        expect_m = [measure.expected_value(self.history, glued0) for measure in self.measures]
+        expect_m = [measure.evaluate(self.history, glued0) for measure in self.measures]
 
         # Raw update 1: Update history
         # Update normalisation to the amount that we cut off
@@ -111,5 +102,22 @@ class Infradistribution:
             measure.offset -= expect0
             measure /= probability
 
+    def reset(self):
+        """
+        Reset internal state
+        """
+        self.history *= 0
+        for measure in self.measures:
+            measure.reset()
+
     def __repr__(self) -> str:
         return repr(self.measures)
+
+    @staticmethod
+    def _glue(value : float, event : int, reward_function : np.ndarray) -> np.ndarray:
+        """
+        Gluing operator: value *^event reward_function
+        """
+        reward_function = reward_function.copy()
+        reward_function[event] = value
+        return reward_function

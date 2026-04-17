@@ -51,9 +51,9 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
         super().update(probabilities, action, outcome)
-        assert outcome.outcome is not None
+        observation = int(outcome.reward > 0.5)  # discretise reward
 
-        self.dists[action].update(self.reward_function, outcome.outcome)
+        self.dists[action].update(self.reward_function, observation)
 
     def get_probabilities(self) -> NDArray[np.float64]:
         return self.build_greedy_policy(self._expected_rewards())
@@ -65,4 +65,4 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return state
 
     def _expected_rewards(self) -> np.ndarray:
-        return np.array([dist.expected_value(self.reward_function) for dist in self.dists])
+        return np.array([dist.evaluate(self.reward_function) for dist in self.dists])
