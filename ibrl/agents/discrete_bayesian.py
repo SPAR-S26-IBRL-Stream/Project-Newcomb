@@ -28,8 +28,7 @@ class DiscreteBayesianAgent(BaseGreedyAgent):
         self.reward_function = np.array([0.,1.])        # reward per outcome
 
     def get_probabilities(self) -> NDArray[np.float64]:
-        expected_rewards = self.prior @ self.hypotheses @ self.reward_function
-        return self.build_greedy_policy(expected_rewards)
+        return self.build_greedy_policy(self._expected_rewards())
 
     def update(self, probabilities, action, outcome):
         super().update(probabilities, action, outcome)
@@ -45,3 +44,6 @@ class DiscreteBayesianAgent(BaseGreedyAgent):
 
     def dump_state(self):
         return dump_array(self.prior)
+
+    def _expected_rewards(self) -> np.ndarray:
+        return self.prior @ self.hypotheses @ self.reward_function

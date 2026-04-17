@@ -56,11 +56,13 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.dists[action].update(self.reward_function, outcome.outcome)
 
     def get_probabilities(self) -> NDArray[np.float64]:
-        expected_rewards = np.array([dist.expected_value(self.reward_function) for dist in self.dists])
-        return self.build_greedy_policy(expected_rewards)
+        return self.build_greedy_policy(self._expected_rewards())
 
     def dump_state(self) -> str:
         state = "["+",".join(dump_array(dist.history,"%d") for dist in self.dists)+"]"
         if self.verbose > 1:
             state += ";" + repr(self.dists)
         return state
+
+    def _expected_rewards(self) -> np.ndarray:
+        return np.array([dist.expected_value(self.reward_function) for dist in self.dists])
