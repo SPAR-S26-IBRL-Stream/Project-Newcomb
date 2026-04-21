@@ -123,9 +123,10 @@ def test_mixku_pessimistic():
 
 def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     """
-    InfraBayesianAgent.bernoulli_grid should choose the same arm as
-    DiscreteBayesianAgent at every step. The raw expected values differ by a
-    global scale factor (from the IB normalization), but argmax is preserved.
+    An IB agent built with a uniform grid of Bernoulli hypotheses should choose
+    the same arm as DiscreteBayesianAgent at every step. The raw expected values
+    differ by a global scale factor (from the IB normalization), but argmax is
+    preserved because the scale is the same across all arms.
     """
     from ibrl.agents.discrete_bayesian import DiscreteBayesianAgent
     from ibrl.agents.infrabayesian import InfraBayesianAgent
@@ -133,11 +134,15 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     n = 3
     num_hypotheses = 5
 
+    wm = MultiBernoulliWorldModel(num_arms=n)
+    grid = [np.array([1 - p, p]) for p in np.linspace(0., 1., num_hypotheses)]
+    params = wm.make_params([grid] * n)
+    hypotheses = [Infradistribution([AMeasure(params)], world_model=wm)]
+
     db = DiscreteBayesianAgent(num_actions=n, num_hypotheses=num_hypotheses,
                                epsilon=0.0, seed=0)
-    ib = InfraBayesianAgent.bernoulli_grid(num_actions=n,
-                                           num_hypotheses=num_hypotheses,
-                                           epsilon=0.0, seed=0)
+    ib = InfraBayesianAgent(num_actions=n, hypotheses=hypotheses,
+                            prior=np.array([1.0]), epsilon=0.0, seed=0)
     db.reset()
     ib.reset()
 
