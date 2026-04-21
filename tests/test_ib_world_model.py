@@ -131,7 +131,7 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     from ibrl.agents.discrete_bayesian import DiscreteBayesianAgent
     from ibrl.agents.infrabayesian import InfraBayesianAgent
 
-    n = 3
+    n = 10
     num_hypotheses = 5
 
     wm = MultiBernoulliWorldModel(num_arms=n)
@@ -150,12 +150,14 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     for step in range(40):
         db_policy = db.get_probabilities()
         ib_policy = ib.get_probabilities()
-
-        assert np.argmax(db_policy) == np.argmax(ib_policy), (
-            f"Step {step}: DB arm={np.argmax(db_policy)}, IB arm={np.argmax(ib_policy)}"
+        
+        # assert arm ordering is the same for both agents
+        assert np.array_equal(np.argsort(db_policy), np.argsort(ib_policy)), (
+            f"Step {step}: DB={db_policy}, IB={ib_policy}"
         )
 
         action = int(rng.integers(n))
+        # hardcode first arm is the best
         reward = float(rng.random() < (0.7 if action == 0 else 0.3))
         outcome = Outcome(reward=reward)
 
