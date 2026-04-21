@@ -147,9 +147,12 @@ class WorldModel(ABC):
         pass
 
     @abstractmethod
-    def update_state(self, state, outcome: Outcome, action: int):
+    def update_state(self, state, outcome: Outcome, action: int,
+                     params=None, policy: np.ndarray | None = None):
         """
         Return new belief state after observing outcome under agent action.
+        params: the a-measure params (needed to access mixture components).
+        policy: the agent's mixed strategy (needed by policy-dependent models).
         Does not mutate state.
         """
         pass
@@ -239,7 +242,8 @@ class MultiBernoulliWorldModel(WorldModel):
         return np.zeros((self.num_arms, self.num_outcomes), dtype=np.int64)
 
     def update_state(self, state: np.ndarray, outcome: Outcome,
-                     action: int) -> np.ndarray:
+                     action: int, params=None,
+                     policy: np.ndarray | None = None) -> np.ndarray:
         new_state = state.copy()
         new_state[action, self.event_index(outcome)] += 1
         return new_state
@@ -277,24 +281,29 @@ class NewcombWorldModel(WorldModel):
     """
     World model for environments where the predictor conditions on the agent's policy.
 
-    Event = env_action (what the predictor did). reward_function[e] is the reward
-    when env_action=e, for the specific agent action being evaluated — the caller
-    constructs this. This means the reward structure is fully captured by
-    reward_function; no belief state is needed.
+    Event = env_action (what the predictor did). reward_function[action] is a 1D
+    array of length num_outcomes; reward_function[action][e] is the reward when
+    env_action=e for agent action.
 
-    Hypothesis params: np.ndarray of shape (num_actions, num_actions),
-                       predictor_matrix[e, a] = P(env_action=e | agent plays a).
+    Single-hypothesis params: np.ndarray of shape (num_actions, num_actions),
+        predictor_matrix[e, a] = P(env_action=e | agent plays a).
 
-    Assumption: P(env_action | policy) is independent of the reward realization.
-    This holds for all standard Newcomb-like problems where the predictor's
-    strategy does not correlate with the reward at stake.
+    Mixed params (after Infradistribution.mix): list of (matrix, weight) pairs,
+        one per hypothesis component. Weights are the prior probabilities and sum to 1.
+
+    Belief state:
+        Single hypothesis: None (stateless — the predictor matrix fully defines the world).
+        Mixture: np.ndarray of shape (K,), accumulated log-likelihoods per component.
+            Starts at zeros (= at prior). Combined with prior log-weights at eval time
+            to give posterior weights, analogously to how _predictive uses arm counts
+            in MultiBernoulliWorldModel.
     """
 
     def __init__(self, num_actions: int):
         self.num_actions = num_actions
 
     @property
-    def num_events(self) -> int:
+    def num_outcomes(self) -> int:
         return self.num_actions
 
     def make_params(self, predictor_matrix: np.ndarray):
@@ -302,28 +311,73 @@ class NewcombWorldModel(WorldModel):
         return predictor_matrix
 
     def mix_params(self, params_list: list, coefficients: np.ndarray):
-        return sum(c * p for p, c in zip(params_list, coefficients))
+        """Return a list of (matrix, prior_weight) pairs — one per input hypothesis.
+        Preserves component identity so posterior weights can be tracked in belief_state.
+        Flattens nested mixtures if any input is already a mixture list.
+        """
+        components = []
+        for p, c in zip(params_list, coefficients):
+            if isinstance(p, list):  # already a mixture — flatten
+                components.extend((mat, w * float(c)) for mat, w in p)
+            else:
+                components.append((p, float(c)))
+        total = sum(w for _, w in components)
+        return [(mat, w / total) for mat, w in components]
 
     def event_index(self, outcome: Outcome) -> int:
         return outcome.env_action
 
-    def initial_state(self):
+    def initial_state(self) -> None:
+        # Always None — for a mixture, state is lazily initialised on first update.
+        # Unlike Bernoulli (where outcome counts are a parameter-free sufficient
+        # statistic), Newcomb has no hypothesis-independent summary of observations:
+        # the evidential value of env_action=e depends on which policy was played,
+        # evaluated against each specific predictor matrix. The state update is
+        # therefore inherently hypothesis-relative and requires params, so we defer
+        # initialisation to update_state where params is available.
         return None
 
-    def update_state(self, state, outcome: Outcome, action: int):
-        return None  # stateless — hypothesis is entirely about predictor strategy
+    def update_state(self, state, outcome: Outcome, action: int,
+                     params=None, policy: np.ndarray | None = None):
+        if not isinstance(params, list):
+            return None  # point hypothesis — stateless
+        if state is None:
+            state = np.zeros(len(params))  # lazy init: shape determined by mixture size
+        log_liks = np.array([
+            np.log(max(float((mat @ policy)[outcome.env_action]), 1e-300))
+            for mat, _ in params
+        ])
+        return state + log_liks  # unnormalized; _posterior_weights normalizes
 
     def is_initial(self, state) -> bool:
-        return state is None
+        if state is None:
+            return True
+        return np.allclose(state, 0)
+
+    def _posterior_weights(self, state, params) -> np.ndarray:
+        """Posterior weights over mixture components: prior × accumulated likelihood."""
+        prior_log_w = np.log([w for _, w in params])
+        log_w = prior_log_w + (state if state is not None else np.zeros(len(params)))
+        log_w -= log_w.max()
+        w = np.exp(log_w)
+        return w / w.sum()
 
     def compute_likelihood(self, belief_state, outcome, params,
                            action: int, policy=None) -> float:
         assert policy is not None
+        if isinstance(params, list):
+            weights = self._posterior_weights(belief_state, params)
+            return sum(w * float((mat @ policy)[outcome.env_action])
+                       for (mat, _), w in zip(params, weights))
         return float((params @ policy)[outcome.env_action])
 
     def compute_expected_reward(self, belief_state, reward_function,
                                 params, action: int, policy=None) -> float:
         assert policy is not None
+        if isinstance(params, list):
+            weights = self._posterior_weights(belief_state, params)
+            return sum(w * float((mat @ policy) @ reward_function)
+                       for (mat, _), w in zip(params, weights))
         return float((params @ policy) @ reward_function)
 ```
 
@@ -386,7 +440,9 @@ class NewcombWorldModel(WorldModel):
 +        measure.scale *= self.world_model.compute_likelihood(
 +            self.belief_state, outcome, measure.params, action=action, policy=policy)
 +    self.belief_state = self.world_model.update_state(self.belief_state, outcome,
-+                                                      action=action)
++                                                      action=action,
++                                                      params=self.measures[0].params,
++                                                      policy=policy)
 
      for i, measure in enumerate(self.measures):
          measure.offset = expect_m[i]
@@ -657,7 +713,7 @@ class SupraPOMDPWorldModel(WorldModel):
     def make_params(self, transition, observation, initial):
         return (transition, observation, initial)
 
-    def update_state(self, belief, outcome, action=None):
+    def update_state(self, belief, outcome, action=None, params=None, policy=None):
         transition, observation, _ = belief_params  # params not needed here; belief carries state
         belief_pred = belief @ transition[:, action, :]
         obs = self.event_index(outcome)
