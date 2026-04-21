@@ -5,64 +5,81 @@ from numpy.typing import NDArray
 from . import BaseGreedyAgent
 from ..infrabayesian.a_measure import AMeasure
 from ..infrabayesian.infradistribution import Infradistribution
-from ..utils import dump_array
+from ..infrabayesian.world_model import MultiBernoulliWorldModel
 
 
 class InfraBayesianAgent(BaseGreedyAgent):
     """
-    Agent using infrabayesian inference
-    This is intended for environments two discrete outcomes, with rewards 0 and 1.
-    The structure could easily be extended to more outcomes and different rewards.
+    Agent using infrabayesian inference with an explicit WorldModel.
 
-    For each action, the agent maintains an mixed infradistribution, which corresponds to a classical distribution
-    over (non-mixed) infradistributions, where each infradistribution represents a hypothesis.
+    A single shared infradistribution is maintained over all actions. Observations
+    under any action update the shared belief, so evidence from arm 0 informs
+    predictions for arm 1 (and vice versa) through the shared hypothesis prior.
 
-    Each non-mixed infradistribution can contain either a single a-measure, in which case it represents a concrete
-    possible world, or multiple a-measures, in which case it represents Knightian Uncertainty between those worlds.
-
-    By default, non-mixed infradistributions are initialised uniformly in the interval [0,1] (reward probabilities)
-    Mixed infradistributions are initialised to uniform priors of the non-mixed ones without KU.
-    This corresponds to the DiscreteBayesianAgent.
+    Use InfraBayesianAgent.bernoulli_grid() for the default Bernoulli bandit setup
+    matching the old num_hypotheses interface.
     """
+
     def __init__(self, *args,
-            num_hypotheses : int = 5,
-            **kwargs):
+                 hypotheses: list[Infradistribution],
+                 prior: np.ndarray | None = None,
+                 reward_function: np.ndarray | None = None,
+                 **kwargs):
         super().__init__(*args, **kwargs)
-        self.num_hypotheses = num_hypotheses
-        self.hypotheses = np.stack([                    # shape (num_hypotheses,num_outcomes=2)
-            np.linspace(1., 0., self.num_hypotheses),   # probability of outcome 0
-            np.linspace(0., 1., self.num_hypotheses)    # probability of outcome 1
-        ],axis=-1)
-        self.reward_function = np.array([0.,1.])        # reward per outcome
+        assert len(hypotheses) > 0
+        assert all(
+            isinstance(h.world_model, type(hypotheses[0].world_model))
+            for h in hypotheses
+        ), "All hypotheses must share the same WorldModel type"
+        self.hypotheses = hypotheses
+        self.prior = (
+            prior if prior is not None
+            else np.ones(len(hypotheses)) / len(hypotheses)
+        )
+        self.reward_function = (
+            reward_function if reward_function is not None
+            else np.tile([0., 1.], (self.num_actions, 1))
+        )
+
+    @classmethod
+    def bernoulli_grid(cls, num_actions: int, num_hypotheses: int = 5,
+                       prior: np.ndarray | None = None,
+                       **kwargs) -> "InfraBayesianAgent":
+        """
+        Convenience constructor: uniform grid of Bernoulli hypotheses.
+        Matches the old default num_hypotheses behaviour and is equivalent to
+        DiscreteBayesianAgent (V(π) is linear for MABs so argmax is optimal).
+        """
+        wm = MultiBernoulliWorldModel(num_arms=num_actions)
+        grid = [np.array([1 - p, p]) for p in np.linspace(0., 1., num_hypotheses)]
+        # Each arm gets the same N-point hypothesis grid independently.
+        # A single a-measure with N components per arm gives correct independent
+        # per-arm Bayesian inference — no joint enumeration needed.
+        params = wm.make_params([grid] * num_actions)
+        hypotheses = [Infradistribution([AMeasure(params)], world_model=wm)]
+        return cls(
+            num_actions=num_actions,
+            hypotheses=hypotheses,
+            prior=np.array([1.0]),
+            **kwargs,
+        )
 
     def reset(self):
         super().reset()
-        self.dists = []
-        for _ in range(self.num_actions):
-            # Initialise hypotheses (infradistributions)
-            infradistributions = [
-                Infradistribution([AMeasure.pure(self.hypotheses[i])])
-                    for i in range(self.num_hypotheses)
-            ]
-            # Initialise prior (uniform distribution)
-            coefficients = np.ones(self.num_hypotheses) / self.num_hypotheses
-            # Mix infradistributions
-            self.dists.append(Infradistribution.mix(infradistributions, coefficients))
+        self.dist = Infradistribution.mix(self.hypotheses, self.prior)
 
     def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
         super().update(probabilities, action, outcome)
-        observation = int(outcome.reward > 0.5)  # discretise reward
-
-        self.dists[action].update(self.reward_function, observation)
+        self.dist.update(
+            self.reward_function, outcome, action=action, policy=probabilities
+        )
 
     def get_probabilities(self) -> NDArray[np.float64]:
-        return self.build_greedy_policy(self._expected_rewards())
+        rewards = np.array([
+            self.dist.evaluate_action(self.reward_function[a], action=a)
+            for a in range(self.num_actions)
+        ])
+        return self.build_greedy_policy(rewards)
 
     def dump_state(self) -> str:
-        state = "["+",".join(dump_array(dist.history,"%d") for dist in self.dists)+"]"
-        if self.verbose > 1:
-            state += ";" + repr(self.dists)
-        return state
-
-    def _expected_rewards(self) -> np.ndarray:
-        return np.array([dist.evaluate(self.reward_function) for dist in self.dists])
+        return str(self.dist.belief_state)
