@@ -80,10 +80,12 @@ class AMeasure:
 
     def evaluate_policy(self, world_model, belief_state,
                                   reward_function, policy) -> float:
-        """V(π) = Σ_a π(a) × E[reward | a, π] for this a-measure."""
+        """V(π) = Σ_a π(a) × E[reward | a, π] for this a-measure.
+        reward_function: shape (num_actions, num_outcomes).
+        """
         raw = sum(
             policy[a] * world_model.compute_expected_reward(
-                belief_state, reward_function, self.params, action=a, policy=policy
+                belief_state, reward_function[a], self.params, action=a, policy=policy
             )
             for a in range(len(policy))
         )
@@ -350,7 +352,7 @@ class NewcombWorldModel(WorldModel):
 +                   policy: np.ndarray | None = None) -> float:
 -    return min(measure.evaluate(self.history, reward_function)
 +    return min(measure.evaluate_action(self.world_model, self.belief_state,
-+                                      reward_function, action=action, policy=policy)
++                                      reward_function[action], action=action, policy=policy)
                for measure in self.measures)
 ```
 
@@ -364,8 +366,10 @@ class NewcombWorldModel(WorldModel):
 +           action: int,
 +           policy: np.ndarray | None = None) -> None:
 +    event = self.world_model.event_index(outcome)
-     glued0 = self._glue(0, event, reward_function)
-     glued1 = self._glue(1, event, reward_function)
+-    glued0 = self._glue(0, event, reward_function)
+-    glued1 = self._glue(1, event, reward_function)
++    glued0 = self._glue(0, event, reward_function[action])
++    glued1 = self._glue(1, event, reward_function[action])
 -    expect0 = self.evaluate_action(glued0)
 -    expect1 = self.evaluate_action(glued1)
 +    expect0  = self.evaluate_action(glued0, action=action, policy=policy)
@@ -471,7 +475,7 @@ def evaluate_policy(self, reward_function: np.ndarray,
 +    self.hypotheses = hypotheses
 +    self.prior = prior if prior is not None else np.ones(len(hypotheses)) / len(hypotheses)
 +    self.reward_function = reward_function if reward_function is not None \
-+                           else np.array([0., 1.])
++                           else np.tile([0., 1.], (self.num_actions, 1))
 ```
 
 **`reset()` — one shared infradistribution**
@@ -559,11 +563,11 @@ The three qualitatively different cases:
 |---|---|---|
 | Standard MAB (independent arms) | Linear | Deterministic — LP finds the argmax vertex |
 | Newcomb | Linear (slope favours one-boxing) | Deterministic one-boxing |
-| Death in Damascus | Piecewise-linear, interior maximum | Uniform mix — LP finds it at p = 0.5 |
+| Death in Damascus | Quadratic (V = 2p(1-p)), interior maximum | Uniform mix — requires SLSQP, not LP |
 
 For MABs, the LP is equivalent to argmax — no behavioural change. For NDPs, it correctly finds mixed policies that per-arm argmax cannot represent.
 
-Note: for `NewcombWorldModel`, where `α_m(π)` depends on `policy` (the predictor conditions on it), the LP constraint matrix is no longer constant — `v_m` is itself a function of `π`. This makes the problem bilinear, not linear. The LP formulation above works for policy-independent world models (Bernoulli); for Newcomb, an iterative scheme (fix π, solve for worst-case m, fix m, solve for best π) or the SLSQP fallback is needed.
+Note: for `NewcombWorldModel` with a 1D reward_function, `α_m(π) = (P_m @ π) @ rf` is linear in π, so the LP is valid. With a 2D reward_function (action-dependent payoffs, e.g. Death in Damascus), `α_m(π) = Σ_a π[a] × (P_m @ π) @ rf[a]` is quadratic in π — the LP constraint matrix is no longer constant and the LP formulation is invalid. In that case, maximise `dist.evaluate_policy(reward_function, π)` directly via SLSQP. The objective is always concave (infimum of concave functions), so SLSQP finds the global optimum. This is Fix 2 — to be addressed separately.
 
 **`dump_state`**
 
@@ -596,6 +600,7 @@ For `BernoulliWorldModel`, arms are independent so V(π) is linear and the optim
 
 ```python
 # Newcomb: prior over two predictor strategy hypotheses
+# Reward: one-box (action=1) gets 1 if predictor opens box B (env=1), else 0.
 wm = NewcombWorldModel(num_actions=2)
 agent = InfraBayesianAgent(
     num_actions=2,
@@ -604,11 +609,24 @@ agent = InfraBayesianAgent(
         Infradistribution([AMeasure(wm.make_params(np.full((2,2), 0.5)))],   world_model=wm),
     ],
     prior=np.array([0.5, 0.5]),
+    # reward_function defaults to np.tile([0., 1.], (2, 1)) — same rf for both actions.
+    # Correct for Newcomb where reward depends only on env_action.
 )
 # Agent will learn the predictor's strategy and converge to one-boxing policy.
 
-# Death in Damascus: same structure, symmetric reward matrix
-# Agent will converge to uniform mixing (0.5, 0.5).
+# Death in Damascus: action-dependent reward — you live only if you go where Death isn't.
+# stay=0, flee=1; env_action=0 means Death stays in Damascus, env_action=1 means Death flees.
+# Reward: 1 if agent and Death are in different cities, 0 if same.
+agent_did = InfraBayesianAgent(
+    num_actions=2,
+    hypotheses=[Infradistribution([AMeasure(wm.make_params(np.eye(2)))], world_model=wm)],
+    prior=np.array([1.0]),
+    reward_function=np.array([
+        [0., 1.],   # stay (action=0): die if Death stays (env=0), live if Death flees (env=1)
+        [1., 0.],   # flee (action=1): live if Death stays (env=0), die if Death flees (env=1)
+    ]),
+)
+# V(π) = 2·π[0]·π[1], maximised at π=(0.5, 0.5). Agent will converge to uniform mixing.
 ```
 
 ---
@@ -920,24 +938,25 @@ def test_newcomb_policy_optimisation_favours_one_boxing():
 
 
 def test_death_in_damascus_converges_to_uniform():
-    """Death in Damascus: V(π) is quadratic, optimal is uniform mix.
-    The policy optimiser should find π ≈ (0.5, 0.5) analytically.
+    """Death in Damascus: V(π) is quadratic with the correct action-dependent reward,
+    and the optimal policy is uniform mix.
 
-    Reward structure:
-        R(Damascus, π) = 10 w.p. π(Aleppo)
-        R(Aleppo,   π) = 10 w.p. π(Damascus)
-    V(p) = 20p(1-p), maximised at p = 0.5.
+    With perfect predictor P=eye(2) and reward_function=[[0,1],[1,0]]:
+        E[r | stay,   π] = (eye @ π) @ [0, 1] = π[1]
+        E[r | flee,   π] = (eye @ π) @ [1, 0] = π[0]
+        V(π) = π[0]·π[1] + π[1]·π[0] = 2·π[0]·π[1]
+    Maximised at π = (0.5, 0.5), V = 0.5.
     """
     from ibrl.agents.infrabayesian import InfraBayesianAgent
-    # Death in Damascus: predictor goes where you go — modelled as mirroring policy
-    # stay=0, flee=1; env_action=0 means Death stays, env_action=1 means Death flees
-    # reward=1 if you are in different city from Death, else 0
     wm = NewcombWorldModel(num_actions=2)
-    # Perfect predictor hypothesis: Death goes where you go
     agent = InfraBayesianAgent(
         num_actions=2,
         hypotheses=[Infradistribution([AMeasure(wm.make_params(np.eye(2)))], world_model=wm)],
         prior=np.array([1.0]),
+        reward_function=np.array([
+            [0., 1.],   # stay: die if Death stays (env=0), live if Death flees (env=1)
+            [1., 0.],   # flee: live if Death stays (env=0), die if Death flees (env=1)
+        ]),
     )
     agent.reset()
     policy = agent.get_probabilities()
