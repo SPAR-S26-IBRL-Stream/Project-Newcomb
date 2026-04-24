@@ -156,6 +156,28 @@ class MultiBernoulliWorldModel(WorldModel):
         probs = self._predictive(belief_state[action], params[action])
         return float(probs @ reward_function)
 
+    def to_str(self, params : list[tuple[float,np.ndarray]]) -> str:
+        """
+        String representation of measure:
+            [meas1;meas2;...]
+        where measX is the measure for arm X:
+            comp1,comp2,...
+        where compY is the Y-th component of the measure:
+            c:{p1,p2,...}
+        where c is the mixing coefficient and pZ is the probability of the Z-th outcome
+
+        E.g.: 1 arm, 2 components (60-40 mix of p=0.9 and p=0.8), 2 outcomes (1-p,p):
+            -> [0.60:{0.1,0.9},0.40:{0.2,0.8}]
+        """
+        per_arm_params = []
+        for arm in range(self.num_arms):
+            log_probs,coefficients = params[arm]
+            components = []
+            for c,p in zip(coefficients,np.exp(log_probs)):
+                components.append(f"""{c:.2f}:{{{",".join(f"{pp:.1f}" for pp in p)}}}""")
+            per_arm_params.append(",".join(components))
+        return "[" + ";".join(per_arm_params) + "]"
+
     def _predictive(self, arm_counts: np.ndarray, arm_params) -> np.ndarray:
         """Posterior predictive P(next outcome | arm history) for mixture of categoricals."""
         log_probs, coefficients = arm_params

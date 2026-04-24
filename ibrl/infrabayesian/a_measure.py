@@ -45,5 +45,6 @@ class AMeasure:
         self.offset /= other
         return self
 
-    def __repr__(self) -> str:
-        return f"({self.scale:.3f}[...],{self.offset:.3f})"
+    def to_str(self, world_model) -> str:
+        """ String representation: "(λμ,b)" """
+        return f"({self.scale:.3f}{world_model.to_str(self.params)},{self.offset:.3f})"

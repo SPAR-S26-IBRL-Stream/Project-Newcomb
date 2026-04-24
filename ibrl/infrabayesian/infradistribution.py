@@ -124,7 +124,7 @@ class Infradistribution:
             measure.reset()
 
     def __repr__(self) -> str:
-        return repr(self.measures)
+        return "[" + ", ".join(measure.to_str(self.world_model) for measure in self.measures) + "]"
 
     @staticmethod
     def _glue(value : float, event : int, reward_function : np.ndarray) -> np.ndarray:
