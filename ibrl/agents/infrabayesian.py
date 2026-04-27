@@ -22,6 +22,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
             hypotheses : list[Infradistribution],
             prior : np.ndarray | None = None,
             reward_function : np.ndarray | None = None,
+            policy_discretisation : int = 0,
             **kwargs):
         super().__init__(*args, **kwargs)
         assert len(hypotheses) > 0
@@ -32,6 +33,13 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.reward_function = (reward_function if reward_function is not None
                                 else np.tile([0., 1.], (self.num_actions, 1)))
 
+        # TODO should be possible to generalise this to more actions
+        assert self.num_actions == 2
+        self.policies = [
+            np.array([1-p, p])
+            for p in np.linspace(0., 1., 2 + policy_discretisation)
+        ]
+
     def reset(self):
         super().reset()
         self.dist = Infradistribution.mix(self.hypotheses, self.prior)
@@ -41,7 +49,13 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.dist.update(self.reward_function, outcome, action=action, policy=probabilities)
 
     def get_probabilities(self) -> NDArray[np.float64]:
-        return self.build_greedy_policy(self._expected_rewards())
+        # TODO handle this better
+        if len(self.policies) == 2:
+            # For validation against classical agent: return greedy policy
+            return self.build_greedy_policy(self._expected_rewards())
+        else:
+            # For optimal IB behaviour: just return optimal policy (without exploration)
+            return self._expected_rewards()
 
     def dump_state(self) -> str:
         state = str(self.dist.belief_state)
@@ -50,7 +64,13 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return state
 
     def _expected_rewards(self) -> np.ndarray:
-        return np.array([
-            self.dist.evaluate_action(self.reward_function[a], action=a)
-            for a in range(self.num_actions)
+        # Iterate over policies and compute expected reward: E[π] = Σ_a E_π[a] π(a)
+        expected_rewards = np.array([sum(
+            self.dist.evaluate_action(self.reward_function[a], a, policy) * policy[a]
+                for a in range(self.num_actions)
+            ) for policy in self.policies
         ])
+
+        # Find all optimal policies, sum them up and normalise
+        optimal_policies = (expected_rewards > expected_rewards.max()*0.999999)
+        return (self.policies*np.expand_dims(optimal_policies,axis=1)).sum(axis=0) / sum(optimal_policies)
