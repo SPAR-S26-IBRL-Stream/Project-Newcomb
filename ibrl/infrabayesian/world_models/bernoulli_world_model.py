@@ -81,6 +81,7 @@ class MultiBernoulliWorldModel(WorldModel):
         return mixed
 
     def event_index(self, outcome: Outcome) -> int:
+        # For Bernoulli bandits reward is the event type, so this mapping is exact.
         return int(round(outcome.reward * (self.num_outcomes - 1)))
 
     def initial_state(self) -> BernoulliWorldModelBeliefState:
