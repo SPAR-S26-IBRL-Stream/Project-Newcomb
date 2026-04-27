@@ -4,7 +4,7 @@ import pytest
 
 from ibrl.infrabayesian.a_measure import AMeasure
 from ibrl.infrabayesian.infradistribution import Infradistribution
-from ibrl.infrabayesian.world_model import MultiBernoulliWorldModel
+from ibrl.infrabayesian import MultiBernoulliWorldModel
 from ibrl.outcome import Outcome
 
 NUM_ARMS = 1
