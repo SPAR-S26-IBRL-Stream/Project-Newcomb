@@ -87,11 +87,11 @@ class MultiBernoulliWorldModel(WorldModel):
         return BernoulliWorldModelBeliefState(np.zeros((self.num_arms, self.num_outcomes), dtype=np.int64))
 
     def update_state(self,
-            state: np.ndarray,
+            state: BernoulliWorldModelBeliefState,
             outcome: Outcome,
             action: int,
             params=None,
-            policy: np.ndarray | None = None) -> BernoulliWorldModelParameters:
+            policy: np.ndarray | None = None) -> BernoulliWorldModelBeliefState:
         new_state = BernoulliWorldModelBeliefState(state.history.copy())
         new_state.history[action, self.event_index(outcome)] += 1
         return new_state
