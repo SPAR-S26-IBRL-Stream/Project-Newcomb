@@ -81,7 +81,7 @@ class Infradistribution:
         Update all a-measures upon seeing a certain event using a given reward function
         This is Definition 11 from Basic Inframeasure Theory
         """
-        event = self.world_model.event_index(outcome)
+        event = self.world_model.event_index(outcome, action)
         rf = reward_function[action]
 
         # Expectation values (need to be computed before updating anything)

@@ -32,7 +32,7 @@ class WorldModel(ABC):
         pass
 
     @abstractmethod
-    def event_index(self, outcome: Outcome) -> int:
+    def event_index(self, outcome: Outcome, action : int) -> int:
         """
         Extract the discrete event index from an outcome.
         Used by the gluing operator and belief state update.
