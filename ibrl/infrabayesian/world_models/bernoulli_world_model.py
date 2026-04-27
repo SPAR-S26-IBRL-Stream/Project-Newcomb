@@ -73,11 +73,11 @@ class MultiBernoulliWorldModel(WorldModel):
         for arm in range(self.num_arms):
             # List of possible outcome distributions is concatenation of distributions from all components
             log_probs = np.concatenate([p.log_probs[arm] for p in params_list], axis=0)
-            # Mixture coefficients are product of old an new mixture coefficients
-            mixing_coefficients = np.concatenate([p.coefficients[arm] * c for p, c in zip(params_list, coefficients)])
-            mixing_coefficients /= mixing_coefficients.sum()  # For numerics
+            # Mixture coefficients are product of old and new mixture coefficients
+            mixed_coefficients = np.concatenate([p.coefficients[arm] * c for p, c in zip(params_list, coefficients)])
+            mixed_coefficients /= mixed_coefficients.sum()  # For numerics
             mixed.log_probs.append(log_probs)
-            mixed.coefficients.append(mixing_coefficients)
+            mixed.coefficients.append(mixed_coefficients)
         return mixed
 
     def event_index(self, outcome: Outcome) -> int:
