@@ -4,6 +4,8 @@ import itertools
 import numpy as np
 
 from .a_measure import AMeasure
+from .world_model import WorldModel
+from ..outcome import Outcome
 
 
 class Infradistribution:
@@ -11,12 +13,12 @@ class Infradistribution:
     An infradistribution, represented by it extremal minimal points
     I.e. we only keep track of the boundaries of the convex hull of minimal points
     """
-    def __init__(self, measures : list[AMeasure]):
+    def __init__(self, measures : list[AMeasure], world_model : WorldModel):
         assert isinstance(measures, list)
         assert len(measures) > 0
         self.measures = measures
-        # Store number of occurrences of each outcome
-        self.history = np.zeros(self.measures[0].num_outcomes, dtype=np.int64)  # number so occurrences
+        self.world_model = world_model
+        self.belief_state = self.world_model.initial_state()
 
     @classmethod
     def mix(cls, components : list[Infradistribution], coefficients : np.ndarray):
@@ -28,24 +30,23 @@ class Infradistribution:
         # Make sure that infradistributions are unused
         # Mixing used infradistributions would be more complicated
         for component in components:
-            assert component.history.sum() == 0
+            assert component.world_model.is_initial(component.belief_state)
             for measure in component.measures:
                 assert np.isclose(measure.scale, 1)
                 assert np.isclose(measure.offset, 0)
-                assert measure.num_outcomes == components[0].measures[0].num_outcomes
+        assert all(isinstance(c.world_model, type(components[0].world_model)) for c in components)
 
         new_measures = []
         assert np.isclose(coefficients.sum(), 1)
 
         # Iterate over all possible combinations of exactly one a-measure from each infradistribution
         for measures in itertools.product(*(component.measures for component in components)):
-            # Create mixed a-measure, by mixing all a-measures according to the mixing coefficients
-            # Take care to handle the case where some of the a-measure are themselves mixtures
-            mix_probabilities = np.exp(np.concatenate([measure.log_probabilities for measure in measures], axis=0))
-            mix_coefficients = np.concatenate([measure.coefficients*coefficients[i] for i,measure in enumerate(measures)])
-            mix_coefficients /= mix_coefficients.sum()  # for numerics
-            new_measures.append(AMeasure.mixed(mix_probabilities,mix_coefficients))
-        return cls(new_measures)
+            # Create mixed a-measure by delegating to world_model — handles mixtures internally
+            mixed_params = components[0].world_model.mix_params(
+                [m.params for m in measures], coefficients
+            )
+            new_measures.append(AMeasure(mixed_params))
+        return cls(new_measures, world_model=components[0].world_model)
 
     @classmethod
     def mixKU(cls, components : list[Infradistribution]):
@@ -55,42 +56,54 @@ class Infradistribution:
         # Make sure that infradistributions are unused
         # Mixing used infradistributions would be more complicated
         for component in components:
-            assert component.history.sum() == 0
+            assert component.world_model.is_initial(component.belief_state)
             for measure in component.measures:
                 assert np.isclose(measure.scale, 1)
                 assert np.isclose(measure.offset, 0)
-                assert measure.num_outcomes == components[0].measures[0].num_outcomes
+        assert all(isinstance(c.world_model, type(components[0].world_model)) for c in components)
 
-        return cls(sum((component.measures for component in components), start=[]))
+        return cls(sum((component.measures for component in components), start=[]),
+                   world_model=components[0].world_model)
 
-
-    def evaluate(self, reward_function : np.ndarray) -> float:
+    def evaluate_action(self, reward_function : np.ndarray, action : int,
+                        policy : np.ndarray | None = None) -> float:
         """
         Pessimistic expected value of a given reward function
         Defined as minimal expected value over all minimal points
         """
-        return min(measure.evaluate(self.history, reward_function) for measure in self.measures)
+        return min(measure.evaluate_action(self.world_model, self.belief_state,
+                                           reward_function, action=action, policy=policy)
+                   for measure in self.measures)
 
-    def update(self, reward_function : np.ndarray, event : int) -> None:
+    def update(self, reward_function : np.ndarray, outcome : Outcome,
+               action : int, policy : np.ndarray | None = None) -> None:
         """
         Update all a-measures upon seeing a certain event using a given reward function
         This is Definition 11 from Basic Inframeasure Theory
         """
+        event = self.world_model.event_index(outcome)
+        rf = reward_function[action]
+
         # Expectation values (need to be computed before updating anything)
-        glued0 = Infradistribution._glue(0, event, reward_function)
-        glued1 = Infradistribution._glue(1, event, reward_function)
-        expect0 = self.evaluate(glued0)
-        expect1 = self.evaluate(glued1)
+        glued0 = Infradistribution._glue(0, event, rf)
+        glued1 = Infradistribution._glue(1, event, rf)
+        expect0 = self.evaluate_action(glued0, action=action, policy=policy)
+        expect1 = self.evaluate_action(glued1, action=action, policy=policy)
         probability = expect1 - expect0
         assert probability > 0  # If probability==0, the measure should be removed (to it, nothing matters anymore)
-        expect_m = [measure.evaluate(self.history, glued0) for measure in self.measures]
+        expect_m = [measure.evaluate_action(self.world_model, self.belief_state, glued0,
+                                            action=action, policy=policy)
+                    for measure in self.measures]
 
-        # Raw update 1: Update history
+        # Raw update 1: Update belief state
         # Update normalisation to the amount that we cut off
         # This is the m*L term of the IB update rule
         for measure in self.measures:
-            measure.scale *= measure.compute_probabilities(self.history)[event]
-        self.history[event] += 1
+            measure.scale *= self.world_model.compute_likelihood(
+                self.belief_state, outcome, measure.params, action=action, policy=policy)
+        self.belief_state = self.world_model.update_state(
+            self.belief_state, outcome, action=action,
+            params=self.measures[0].params, policy=policy)
 
         # Raw update 2: Add off-history reward to offset
         # The measure evaluation includes the offset, so we do an assignment here, rather than an addition
@@ -106,12 +119,12 @@ class Infradistribution:
         """
         Reset internal state
         """
-        self.history *= 0
+        self.belief_state = self.world_model.initial_state()
         for measure in self.measures:
             measure.reset()
 
     def __repr__(self) -> str:
-        return repr(self.measures)
+        return "[" + ", ".join(measure.to_str(self.world_model) for measure in self.measures) + "]"
 
     @staticmethod
     def _glue(value : float, event : int, reward_function : np.ndarray) -> np.ndarray:
