@@ -47,7 +47,7 @@ class BaseGreedyAgent(BaseAgent):
 
     def build_epsilon_greedy_policy(self, values : NDArray[np.float64]) -> NDArray[np.float64]:
         # Exploitation: sample uniformly across actions with highest value
-        best_actions = (values > 0.999999*values.max())
+        best_actions = np.isclose(values, values.max())
         exploit = np.ones_like(values)*best_actions / best_actions.sum()
 
         # Exploration: sample uniformly across all actions
