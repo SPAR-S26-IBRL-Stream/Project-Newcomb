@@ -7,5 +7,6 @@ __all__ = [
     "AMeasure",
     "Infradistribution",
     "WorldModel",
-    "MultBernoulliWorldModel",
+    "MultiBernoulliWorldModel"
 ]
+
