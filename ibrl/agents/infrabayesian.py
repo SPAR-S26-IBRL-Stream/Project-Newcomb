@@ -77,5 +77,5 @@ class InfraBayesianAgent(BaseGreedyAgent):
         ])
 
         # Find all optimal policies, sum them up and normalise
-        optimal_policies = (expected_rewards > expected_rewards.max()*0.999999)
+        optimal_policies = np.isclose(expected_rewards, expected_rewards.max())
         return (self.policies*np.expand_dims(optimal_policies,axis=1)).sum(axis=0) / sum(optimal_policies)
