@@ -32,7 +32,7 @@ class WorldModel(ABC):
         pass
 
     @abstractmethod
-    def event_index(self, outcome: Outcome) -> int:
+    def event_index(self, outcome: Outcome, action : int) -> int:
         """
         Extract the discrete event index from an outcome.
         Used by the gluing operator and belief state update.
@@ -46,12 +46,11 @@ class WorldModel(ABC):
 
     @abstractmethod
     def update_state(self, state, outcome: Outcome, action: int,
-                     params=None, policy: np.ndarray | None = None):
+                     policy: np.ndarray):
         """
         Return new belief state after observing outcome under agent action.
         Does not mutate state.
-        params: needed by policy-dependent models (ignored by Bernoulli).
-        policy: needed by policy-dependent models (ignored by Bernoulli).
+        Policy needed by policy-dependent models (ignored by Bernoulli).
         """
         pass
 
@@ -62,7 +61,7 @@ class WorldModel(ABC):
 
     @abstractmethod
     def compute_likelihood(self, belief_state, outcome: Outcome, params,
-                           action: int, policy: np.ndarray | None = None) -> float:
+                           action: int, policy: np.ndarray) -> float:
         """
         P(outcome | belief_state, params, action) under this hypothesis.
         Returns a scalar in [0, 1].
@@ -71,8 +70,7 @@ class WorldModel(ABC):
 
     @abstractmethod
     def compute_expected_reward(self, belief_state, reward_function: np.ndarray,
-                                params, action: int,
-                                policy: np.ndarray | None = None) -> float:
+                                params, action: int, policy: np.ndarray) -> float:
         """
         E[reward_function(outcome) | belief_state, params, action].
         Returns a scalar.

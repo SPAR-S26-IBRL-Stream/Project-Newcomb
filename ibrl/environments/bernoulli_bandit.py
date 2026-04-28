@@ -12,8 +12,8 @@ class BernoulliBanditEnvironment(BaseEnvironment):
     If probs are provided at construction, they are used as-is and persist across resets.
     Otherwise, probabilities are sampled uniformly from [0, 1] on each reset.
     """
-    def __init__(self, *args, probs=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, probs=None, **kwargs):
+        super().__init__(**kwargs)
         self._fixed_probs = np.array(probs, dtype=float) if probs is not None else None
 
     def _resolve(self, env_action: int | None, action: int) -> float:

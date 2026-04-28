@@ -1,6 +1,5 @@
 from abc import ABC,abstractmethod
 import numpy as np
-from numpy.typing import NDArray
 
 from ..outcome import Outcome
 
@@ -14,9 +13,8 @@ class BaseAgent(ABC):
         seed:        Seed for random number generator
         verbose:     Request debugging output
     """
-    def __init__(self,
+    def __init__(self, *,
             num_actions : int,
-            *,
             seed : int = 0x01234567,  # Default needs to be different from environment
             verbose : int = 0):
         """
@@ -29,14 +27,14 @@ class BaseAgent(ABC):
         self.verbose = verbose
 
     @abstractmethod
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         """
         Return the probability distribution to be used in the next episode. Action are sampled from this distribution.
         The distribution thus fixes the entire behaviour of the agent during the episode.
         """
         pass
 
-    def update(self, probabilities : NDArray[np.float64], action : int, outcome : Outcome) -> None:
+    def update(self, probabilities : np.ndarray, action : int, outcome : Outcome) -> None:
         """
         Update internal state based on outcome of the episode
 

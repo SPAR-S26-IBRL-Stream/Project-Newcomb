@@ -1,8 +1,7 @@
 import numpy as np
-from numpy.typing import NDArray
 
 
-def sample_action(rng : np.random.Generator, probabilities: NDArray[np.float64]) -> int:
+def sample_action(rng : np.random.Generator, probabilities: np.ndarray) -> int:
     """
     Sample an action from a given probability distribution
 

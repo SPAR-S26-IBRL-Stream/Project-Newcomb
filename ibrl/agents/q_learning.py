@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..utils import dump_array
@@ -12,14 +11,14 @@ class QLearningAgent(BaseGreedyAgent):
     Arguments:
         learning_rate: Learning rate for Q-learning or None (or negative value) to use sample averages
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             learning_rate : float | None = 0.1,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.learning_rate = None if (isinstance(learning_rate,float) and learning_rate < 0) else learning_rate
 
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         return self.build_greedy_policy(self.q)
 
     def update(self, probabilities, action, outcome):

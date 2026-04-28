@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import QLearningAgent
 from ..utils import sample_action
@@ -11,7 +10,7 @@ class ExperimentalAgent1(QLearningAgent):
     return a deterministic distribution that chooses this action.
     Consequently, we only access the diagonal of the reward matrix.
     """
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         proto_probabilities = super().get_probabilities()
         action = sample_action(self.random, proto_probabilities)
         probabilities = np.zeros((self.num_actions,))

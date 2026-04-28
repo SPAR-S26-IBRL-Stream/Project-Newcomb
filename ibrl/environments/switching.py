@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseEnvironment
 
@@ -9,10 +8,10 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
     Classical bandit, where only one arm leads to a non-zero reward
     After a fixed number of interactions, the reward moves to a different arm
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             switch_at : int = None,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         if switch_at is None:
             if self.num_steps is None:
                 raise RuntimeError("SwitchingAdversaryEnvironment: require either switch_at or num_steps argument")

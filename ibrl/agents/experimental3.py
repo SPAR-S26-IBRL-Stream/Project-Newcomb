@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import QLearningAgent
 from ..utils import sample_action
@@ -17,17 +16,17 @@ class ExperimentalAgent3(QLearningAgent):
     Arguments:
         resolution: Number of intervals for discretisation
     """
-    def __init__(self,
+    def __init__(self, *,
             num_actions : int,
             resolution : int = 6,
-            *args, **kwargs):
+            **kwargs):
         assert num_actions == 2  # technical limitation for now
         self.real_num_actions = num_actions
         self.resolution = int(resolution)
         num_actions = self.resolution+1
-        super().__init__(num_actions, *args, **kwargs)
+        super().__init__(num_actions=num_actions, **kwargs)
 
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         # The action taken by the underlying Q-learning agent corresponds to the probability of taking action 0
         self.proto_probabilities = super().get_probabilities()
         self.proto_action = sample_action(self.random, self.proto_probabilities)  # store for updating Q-learning agent
@@ -36,7 +35,7 @@ class ExperimentalAgent3(QLearningAgent):
         probabilities[1] = 1 - probabilities[0]
         return probabilities
 
-    def update(self, probabilities : NDArray[np.float64], action : int, outcome):
+    def update(self, probabilities : np.ndarray, action : int, outcome):
         super().update(self.proto_probabilities, self.proto_action, outcome)
 
 

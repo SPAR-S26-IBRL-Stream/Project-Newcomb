@@ -1,6 +1,5 @@
 from abc import ABC,abstractmethod
 import numpy as np
-from numpy.typing import NDArray
 
 from ..outcome import Outcome
 
@@ -18,11 +17,10 @@ class BaseEnvironment(ABC):
         seed:        Seed for random number generator
         verbose:     Request debugging output
     """
-    def __init__(self,
+    def __init__(self, *,
             num_actions : int,
             num_steps : int = None,
             num_runs : int = None,
-            *,
             seed : int = 0x89abcdef,  # Default needs to be different from agent
             verbose : int = 0):
         """
@@ -36,7 +34,7 @@ class BaseEnvironment(ABC):
         self.seed = seed
         self.verbose = verbose
 
-    def step(self, probabilities : NDArray[np.float64], action : int) -> Outcome:
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
         """Execute one round of interaction.
 
         The environment first responds to the agent's policy (e.g. the predictor
@@ -53,7 +51,7 @@ class BaseEnvironment(ABC):
         reward = self._resolve(env_action, action)
         return Outcome(reward=reward, env_action=env_action)
 
-    def _respond(self, probabilities : NDArray[np.float64]) -> int | None:
+    def _respond(self, probabilities : np.ndarray) -> int | None:
         """Environment's move given the agent's policy. Override in subclasses.
 
         For Newcomb-like environments, this is where the predictor samples its

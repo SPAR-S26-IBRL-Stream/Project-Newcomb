@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseEnvironment
 from ..utils import sample_action
@@ -13,18 +12,28 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
     For predicted action i and selected action j, the reward will be reward_table[i,j]
 
     Arguments:
-        reward_table
+        reward_table with reward_table[i,j] = reward on prediction i and action j
+        predictor_accuracy ∈ [0.5, 1] with 0.5 = random, 1.0 = perfect predictor
     """
-    def __init__(self, *args,
+    def __init__(self, *,
+            num_actions : int = None,
             reward_table : list[list[float]],
+            predictor_accuracy : float = 1.0,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        if num_actions is None:
+            num_actions = len(reward_table)
+        super().__init__(num_actions=num_actions, **kwargs)
         assert self.num_actions == 2  # technical limitation for now
         assert self.num_actions == len(reward_table)
         self.reward_table = np.array(reward_table)
+        self.predictor_accuracy = float(predictor_accuracy)
 
-    def _respond(self, probabilities : NDArray[np.float64]) -> int:
-        return sample_action(self.random, probabilities)
+    def _respond(self, probabilities : np.ndarray) -> int:
+        perfect_prediction = probabilities
+        random_prediction = np.ones(self.num_actions) / self.num_actions
+        prediction = perfect_prediction * (2*self.predictor_accuracy - 1) \
+                    + random_prediction * (2 - 2*self.predictor_accuracy)
+        return sample_action(self.random, prediction)
 
     def _resolve(self, env_action : int, action : int) -> float:
         return self.reward_table[env_action, action]
@@ -34,9 +43,20 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
         # The reward is a quadratic function of the probability of taking action 0.
         # Thus, there are three policies that could potentially be optimal
         (a,b),(c,d) = self.reward_table.tolist()
+        acc = self.predictor_accuracy
+
+        # The reward is a quadratic polynomial in p
+        # reward(p) = A + B*p + C*p^2 = D + E*(1-p) + F*(1-p)^2
+        A = acc*(a - c) + c
+        C = (2*acc - 1)*(a + d - b - c)
+        D = acc*(d - b) + b
+        B = D - A - C  # from p==1
+        # Collect[({1 - p, p} (2*acc - 1) + {1/2, 1/2} (2 - 2*acc)) . {{a, b}, {c, d}} . {1 - p, p}, p, List, List] // FullSimplify
+
+        # This polynomial is maximised either for p=0, p=1 or, if C<0, p=-B/2C
         return max(
-            a,  # always take action 0
-            d,  # always take action 1
-            (a*d-(b+c)**2/4)/(a+d-b-c) if (a+d-b-c) < 0 else float("-inf")
-                # take action 0 with probability (b+c-2*d)/(b+c-a-d)/2
+            A,  # p=0, i.e. always take action 0
+            D,  # p=1, i.e. always take action 1
+            A - B**2/(4*C) if (C < 0 and 0 <= -B/(2*C) <= 1) else float("-inf")
+                # take action 0 with finite probability
         )

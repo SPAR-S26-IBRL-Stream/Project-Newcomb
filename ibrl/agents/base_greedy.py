@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseAgent
 
@@ -15,12 +14,12 @@ class BaseGreedyAgent(BaseAgent):
 
     Both epsilon and temperature can be either a fixed float or a tuple (start,decay constant,min) for decreasing exploration.
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             epsilon     : float | tuple[float] | None = None,
             temperature : float | tuple[float] | None = None,
             decay_type  : float = 0,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         if epsilon is not None and temperature is not None:
             raise RuntimeError("Cannot specify both epsilon and temperature")
@@ -35,7 +34,7 @@ class BaseGreedyAgent(BaseAgent):
         self.decay_type = int(decay_type)
         assert self.decay_type in [0,1]
 
-    def build_greedy_policy(self, values : NDArray[np.float64]) -> NDArray[np.float64]:
+    def build_greedy_policy(self, values : np.ndarray) -> np.ndarray:
         """
         Construct probabilities based on given reward estimates and selected policy
         """
@@ -45,7 +44,7 @@ class BaseGreedyAgent(BaseAgent):
             return self.build_softmax_policy(values)
         raise RuntimeError("Invalid state")
 
-    def build_epsilon_greedy_policy(self, values : NDArray[np.float64]) -> NDArray[np.float64]:
+    def build_epsilon_greedy_policy(self, values : np.ndarray) -> np.ndarray:
         # Exploitation: sample uniformly across actions with highest value
         best_actions = np.isclose(values, values.max())
         exploit = np.ones_like(values)*best_actions / best_actions.sum()
@@ -56,7 +55,7 @@ class BaseGreedyAgent(BaseAgent):
         epsilon = self.parse_parameter(self.epsilon)
         return (1 - epsilon) * exploit + epsilon * explore
 
-    def build_softmax_policy(self, values : NDArray[np.float64]) -> NDArray[np.float64]:
+    def build_softmax_policy(self, values : np.ndarray) -> np.ndarray:
         temperature = self.parse_parameter(self.temperature)
 
         # Numerically stable softmax
