@@ -8,7 +8,9 @@ from ..utils import sample_action,dump_array
 def simulate(
         env : BaseEnvironment,
         agent : BaseAgent,
-        options : dict = dict()) -> dict:
+        options : dict = dict(),
+        seed_env : int | None = None,
+        seed_agent : int | None = None) -> dict:
     """
     Simulate interactions between agent and environment
 
@@ -20,6 +22,8 @@ def simulate(
             num_runs:    Number of runs
             num_actions: Number of actions
             verbose:     Request debugging output
+        seed_env:    override environment seed
+        seed_agent:  override agent seed
 
     Returns:
         A dictionary containing summary information, namely
@@ -39,6 +43,11 @@ def simulate(
     all_probabilities = np.zeros((num_runs, num_steps, num_actions))
     actions = np.zeros((num_runs, num_steps), dtype=np.int64)
     rewards = np.zeros((num_runs, num_steps))
+
+    if seed_env is not None:
+        env.seed = seed_env
+    if seed_agent is not None:
+        agent.seed = seed_agent
 
     for run in range(num_runs):
         if verbose > 0:

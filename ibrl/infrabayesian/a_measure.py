@@ -1,28 +1,50 @@
-"""AMeasure — wraps a belief with (lambda, b) a-measure structure."""
 import numpy as np
-from numpy.typing import NDArray
-
-from ..outcome import Outcome
-from .beliefs import BaseBelief
 
 
 class AMeasure:
-    """Wraps a belief with the (lambda, b) structure needed for IB.
-
-    In non-KU mode, lambda=1 and b=0, making this a pure pass-through.
     """
+    An a-measure, characterised by
+        a scale factor λ > 0
+        a probability measure μ (encoded as opaque params — WorldModel defines the structure)
+        an offset b >= 0
 
-    def __init__(self, belief: BaseBelief, scale: float = 1.0, offset: float = 0.0):
-        self.belief = belief
-        self.scale = scale    # λ
-        self.offset = offset  # b
+    AMeasure is a pure data container. All model-family logic (how to compute
+    probabilities, likelihoods, and expected rewards from params) lives in WorldModel.
+    Belief state (the sufficient statistic of observations) lives in Infradistribution.
+    """
+    def __init__(self, params, scale : float = 1, offset : float = 0):
+        assert offset >= 0
+        assert scale > 0
+        self.params = params
+        self.scale = np.float64(scale)
+        self.offset = np.float64(offset)
 
-    def update(self, action: int, outcome: Outcome):
-        self.belief.update(action, outcome)
+    def evaluate_action(self, world_model, belief_state, reward_function : np.ndarray,
+                        action : int, policy=None) -> float:
+        """
+        Compute the scaled and shifted expected value of a given reward function, defined as λ*μ(f) + b
+        """
+        return self.scale * world_model.compute_expected_reward(
+            belief_state, reward_function, self.params, action=action, policy=policy
+        ) + self.offset
 
-    def evaluate(self) -> NDArray[np.float64]:
-        """α(f) = λ · μ(f) + b"""
-        return self.scale * self.belief.predict_rewards() + self.offset
+    def reset(self):
+        """
+        Reset internal state
+        """
+        self.scale = np.float64(1)
+        self.offset = np.float64(0)
 
-    def __repr__(self) -> str:
-        return f"({self.scale:.2f}*{self.belief},{self.offset:.2f})"
+    # Helper functions
+
+    def __itruediv__(self, other : float):
+        """
+        In-place division by a scalar
+        """
+        self.scale /= other
+        self.offset /= other
+        return self
+
+    def to_str(self, world_model) -> str:
+        """ String representation: "(λμ,b)" """
+        return f"({self.scale:.3f}{world_model.to_str(self.params)},{self.offset:.3f})"
