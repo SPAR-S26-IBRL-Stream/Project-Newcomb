@@ -16,14 +16,22 @@ class InfraBayesianAgent(BaseGreedyAgent):
     updated on every step regardless of which action was taken. Each hypothesis is an
     Infradistribution over a shared WorldModel; the prior is a 1D array of weights.
 
-    reward_function has shape (num_actions, num_outcomes): reward_function[a, o] is
-    the reward when action a produces outcome o.
+    Arguments:
+        hypotheses:       list of hypotheses
+        prior:            distribution over hypotheses; default: uniform
+        reward_function:  reward_function[a,o] is reward upon seeing outcome o from action a
+        policy_discretisation:  number of mixed policies to consider per action; default: 0 (i.e. only pure policies)
+        exploration_prefix:     parameter to control exploration
+                                =0    no exploration
+                                >0    forced exploration prefix for given number of steps, then no exploration
+                                None  greedy exploration (epsilon or softmax; breaks regret bounds)
     """
     def __init__(self, *args,
             hypotheses : list[Infradistribution],
-            prior : np.ndarray | None = None,
-            reward_function : np.ndarray | None = None,
+            prior : np.ndarray | None = None,           # shape (len(hypotheses),)
+            reward_function : np.ndarray | None = None, # shape (num_actions, num_outcomes)
             policy_discretisation : int = 0,
+            exploration_prefix : int | None = 0,
             **kwargs):
         super().__init__(*args, **kwargs)
         assert len(hypotheses) > 0
@@ -31,8 +39,10 @@ class InfraBayesianAgent(BaseGreedyAgent):
                    for h in hypotheses), "All hypotheses must share the same WorldModel type"
         self.hypotheses = hypotheses
         self.prior = prior if prior is not None else np.ones(len(hypotheses)) / len(hypotheses)
+        # default: reward_function[a,o] = o with o ∈ {0,1}
         self.reward_function = (reward_function if reward_function is not None
-                                else np.tile([0., 1.], (self.num_actions, 1)))
+                                else np.linspace(np.zeros(self.num_actions),np.ones(self.num_actions),2).T)
+        self.exploration_prefix = exploration_prefix
 
         # Discretise policy space:
         # Let n be the number of actions and 1/d be the distance between discretised policies
@@ -54,13 +64,16 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.dist.update(self.reward_function, outcome, action=action, policy=probabilities)
 
     def get_probabilities(self) -> NDArray[np.float64]:
-        # TODO handle this better
-        if len(self.policies) == self.num_actions:
-            # For validation against classical agent: return greedy policy
+        # Greedy policy: reproduces classical agent, breaks regret bounds
+        if self.exploration_prefix is None:
             return self.build_greedy_policy(self._expected_rewards())
-        else:
-            # For optimal IB behaviour: just return optimal policy (without exploration)
-            return self._expected_rewards()
+
+        # Forced exploration prefix: regret bounds asymptotically preserved
+        if self.step < self.exploration_prefix:
+            return np.ones(self.num_actions) / self.num_actions
+
+        # Use optimal policy: no exploration, almost no learning
+        return self._expected_rewards()
 
     def dump_state(self) -> str:
         state = str(self.dist.belief_state)
