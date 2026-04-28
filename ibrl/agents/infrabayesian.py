@@ -1,4 +1,5 @@
 """InfraBayesianAgent — agent using infrabayesian inference."""
+import itertools
 import numpy as np
 from numpy.typing import NDArray
 
@@ -33,11 +34,15 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.reward_function = (reward_function if reward_function is not None
                                 else np.tile([0., 1.], (self.num_actions, 1)))
 
-        # TODO should be possible to generalise this to more actions
-        assert self.num_actions == 2
+        # Discretise policy space:
+        # Let n be the number of actions and 1/d be the distance between discretised policies
+        # For every n-tuple of non-negative integers (a1, a2, ..., an) with Σ_i ai = d, we get
+        # one possible policy as [a1/d, a2/d, ..., an/d]
+        d = policy_discretisation+1
         self.policies = [
-            np.array([1-p, p])
-            for p in np.linspace(0., 1., 2 + policy_discretisation)
+            np.array(x)/d
+            for x in itertools.product(*[range(d+1) for _ in range(self.num_actions)])
+            if sum(x)==d
         ]
 
     def reset(self):
@@ -50,7 +55,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def get_probabilities(self) -> NDArray[np.float64]:
         # TODO handle this better
-        if len(self.policies) == 2:
+        if len(self.policies) == self.num_actions:
             # For validation against classical agent: return greedy policy
             return self.build_greedy_policy(self._expected_rewards())
         else:
