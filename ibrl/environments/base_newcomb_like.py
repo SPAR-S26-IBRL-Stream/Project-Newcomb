@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseEnvironment
 from ..utils import sample_action
@@ -16,17 +15,20 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
         reward_table with reward_table[i,j] = reward on prediction i and action j
         predictor_accuracy ∈ [0.5, 1] with 0.5 = random, 1.0 = perfect predictor
     """
-    def __init__(self, *args,
+    def __init__(self, *,
+            num_actions : int = None,
             reward_table : list[list[float]],
             predictor_accuracy : float = 1.0,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        if num_actions is None:
+            num_actions = len(reward_table)
+        super().__init__(num_actions=num_actions, **kwargs)
         assert self.num_actions == 2  # technical limitation for now
         assert self.num_actions == len(reward_table)
         self.reward_table = np.array(reward_table)
         self.predictor_accuracy = float(predictor_accuracy)
 
-    def _respond(self, probabilities : NDArray[np.float64]) -> int:
+    def _respond(self, probabilities : np.ndarray) -> int:
         perfect_prediction = probabilities
         random_prediction = np.ones(self.num_actions) / self.num_actions
         prediction = perfect_prediction * (2*self.predictor_accuracy - 1) \

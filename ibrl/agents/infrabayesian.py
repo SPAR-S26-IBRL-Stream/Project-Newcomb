@@ -1,7 +1,6 @@
 """InfraBayesianAgent — agent using infrabayesian inference."""
 import itertools
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..infrabayesian.a_measure import AMeasure
@@ -26,14 +25,14 @@ class InfraBayesianAgent(BaseGreedyAgent):
                                 >0    forced exploration prefix for given number of steps, then no exploration
                                 None  greedy exploration (epsilon or softmax; breaks regret bounds)
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             hypotheses : list[Infradistribution],
             prior : np.ndarray | None = None,           # shape (len(hypotheses),)
             reward_function : np.ndarray | None = None, # shape (num_actions, num_outcomes)
             policy_discretisation : int = 0,
             exploration_prefix : int | None = 0,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         assert len(hypotheses) > 0
         assert all(isinstance(h.world_model, type(hypotheses[0].world_model))
                    for h in hypotheses), "All hypotheses must share the same WorldModel type"
@@ -59,11 +58,11 @@ class InfraBayesianAgent(BaseGreedyAgent):
         super().reset()
         self.dist = Infradistribution.mix(self.hypotheses, self.prior)
 
-    def update(self, probabilities: NDArray[np.float64], action: int, outcome) -> None:
+    def update(self, probabilities: np.ndarray, action: int, outcome) -> None:
         super().update(probabilities, action, outcome)
-        self.dist.update(self.reward_function, outcome, action=action, policy=probabilities)
+        self.dist.update(self.reward_function, outcome, action, probabilities)
 
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         # Greedy policy: reproduces classical agent, breaks regret bounds
         if self.exploration_prefix is None:
             return self.build_greedy_policy(self._expected_rewards())

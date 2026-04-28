@@ -68,8 +68,7 @@ class NewcombWorldModel(WorldModel):
     def update_state(self, state,
             outcome : Outcome,
             action : int,
-            params : NewcombWorldModel,
-            policy : np.ndarray | None = None):
+            policy : np.ndarray):
         pass
 
     def is_initial(self, state) -> bool:
@@ -79,7 +78,7 @@ class NewcombWorldModel(WorldModel):
             outcome : Outcome,
             params : NewcombWorldModel,
             action : int,
-            policy : np.ndarray | None = None) -> float:
+            policy : np.ndarray) -> float:
         """
         P(outcome | belief_state, params, action) under this hypothesis.
         Returns a scalar in [0, 1].
@@ -103,7 +102,7 @@ class NewcombWorldModel(WorldModel):
             reward_function : np.ndarray,
             params : NewcombWorldModel,
             action : int,
-            policy : np.ndarray | None = None) -> float:
+            policy : np.ndarray) -> float:
         """
         E[reward_function(outcome) | belief_state, params, action].
         Returns a scalar.

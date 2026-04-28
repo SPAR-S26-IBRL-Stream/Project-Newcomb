@@ -46,7 +46,7 @@ class Infradistribution:
                 [m.params for m in measures], coefficients
             )
             new_measures.append(AMeasure(mixed_params))
-        return cls(new_measures, world_model=components[0].world_model)
+        return cls(new_measures, components[0].world_model)
 
     @classmethod
     def mixKU(cls, components : list[Infradistribution]):
@@ -63,20 +63,20 @@ class Infradistribution:
         assert all(isinstance(c.world_model, type(components[0].world_model)) for c in components)
 
         return cls(sum((component.measures for component in components), start=[]),
-                   world_model=components[0].world_model)
+                   components[0].world_model)
 
     def evaluate_action(self, reward_function : np.ndarray, action : int,
-                        policy : np.ndarray | None = None) -> float:
+                        policy : np.ndarray) -> float:
         """
         Pessimistic expected value of a given reward function
         Defined as minimal expected value over all minimal points
         """
         return min(measure.evaluate_action(self.world_model, self.belief_state,
-                                           reward_function, action=action, policy=policy)
+                                           reward_function, action, policy)
                    for measure in self.measures)
 
     def update(self, reward_function : np.ndarray, outcome : Outcome,
-               action : int, policy : np.ndarray | None = None) -> None:
+               action : int, policy : np.ndarray) -> None:
         """
         Update all a-measures upon seeing a certain event using a given reward function
         This is Definition 11 from Basic Inframeasure Theory
@@ -87,12 +87,12 @@ class Infradistribution:
         # Expectation values (need to be computed before updating anything)
         glued0 = Infradistribution._glue(0, event, rf)
         glued1 = Infradistribution._glue(1, event, rf)
-        expect0 = self.evaluate_action(glued0, action=action, policy=policy)
-        expect1 = self.evaluate_action(glued1, action=action, policy=policy)
+        expect0 = self.evaluate_action(glued0, action, policy)
+        expect1 = self.evaluate_action(glued1, action, policy)
         probability = expect1 - expect0
         assert probability > 0  # If probability==0, the measure should be removed (to it, nothing matters anymore)
         expect_m = [measure.evaluate_action(self.world_model, self.belief_state, glued0,
-                                            action=action, policy=policy)
+                                            action, policy)
                     for measure in self.measures]
 
         # Raw update 1: Update belief state
@@ -100,10 +100,9 @@ class Infradistribution:
         # This is the m*L term of the IB update rule
         for measure in self.measures:
             measure.scale *= self.world_model.compute_likelihood(
-                self.belief_state, outcome, measure.params, action=action, policy=policy)
+                self.belief_state, outcome, measure.params, action, policy)
         self.belief_state = self.world_model.update_state(
-            self.belief_state, outcome, action=action,
-            params=self.measures[0].params, policy=policy)
+            self.belief_state, outcome, action, policy)
 
         # Raw update 2: Add off-history reward to offset
         # The measure evaluation includes the offset, so we do an assignment here, rather than an addition

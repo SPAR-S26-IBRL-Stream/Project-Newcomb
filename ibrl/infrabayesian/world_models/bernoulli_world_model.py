@@ -91,8 +91,7 @@ class MultiBernoulliWorldModel(WorldModel):
             state: BernoulliWorldModelBeliefState,
             outcome: Outcome,
             action: int,
-            params=None,
-            policy: np.ndarray | None = None) -> BernoulliWorldModelBeliefState:
+            policy: np.ndarray) -> BernoulliWorldModelBeliefState:
         new_state = BernoulliWorldModelBeliefState(state.history.copy())
         new_state.history[action, self.event_index(outcome, action)] += 1
         return new_state
@@ -105,7 +104,7 @@ class MultiBernoulliWorldModel(WorldModel):
             outcome: Outcome,
             params : BernoulliWorldModelParameters,
             action: int,
-            policy: np.ndarray | None = None) -> float:
+            policy: np.ndarray) -> float:
         probs = self._predictive(belief_state.history[action], params.log_probs[action], params.coefficients[action])
         return float(probs[self.event_index(outcome, action)])
 
@@ -114,7 +113,7 @@ class MultiBernoulliWorldModel(WorldModel):
             reward_function: np.ndarray,
             params : BernoulliWorldModelParameters,
             action: int,
-            policy: np.ndarray | None = None) -> float:
+            policy: np.ndarray) -> float:
         probs = self._predictive(belief_state.history[action], params.log_probs[action], params.coefficients[action])
         return float(probs @ reward_function)
 

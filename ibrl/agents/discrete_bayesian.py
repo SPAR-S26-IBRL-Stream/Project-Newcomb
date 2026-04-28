@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..utils import dump_array
@@ -16,10 +15,10 @@ class DiscreteBayesianAgent(BaseGreedyAgent):
     Update this distribution at each iteration based on the observed information.
     Picks the action with the largest expected reward.
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             num_hypotheses : int = 5,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self.num_hypotheses = num_hypotheses
         self.hypotheses = np.stack([                    # shape (num_hypotheses,num_outcomes=2)
             np.linspace(1., 0., self.num_hypotheses),   # probability of outcome 0
@@ -27,7 +26,7 @@ class DiscreteBayesianAgent(BaseGreedyAgent):
         ],axis=-1)
         self.reward_function = np.array([0.,1.])        # reward per outcome
 
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         return self.build_greedy_policy(self._expected_rewards())
 
     def update(self, probabilities, action, outcome):

@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..utils import dump_array
@@ -22,17 +21,17 @@ class ExperimentalAgent2(BaseGreedyAgent):
     Arguments:
         learning_rate: Learning rate for Q-learning or None (or negative value) to use sample averages
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             learning_rate : float | None = None,
             **kwargs):
         assert "temperature" not in kwargs or kwargs["temperature"] is None
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         assert self.num_actions == 2  # technical limitation for now
         self.learning_rate = None if (isinstance(learning_rate,float) and learning_rate < 0) else learning_rate
         self.update_threshold = 0.9 # minimum probability to be considered for update
         self.exploration_peak = 20  # how strongly peaked should exploration policies be
 
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         epsilon = self.parse_parameter(self.epsilon)
 
         if self.random.binomial(1, epsilon):
