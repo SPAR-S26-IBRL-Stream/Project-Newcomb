@@ -15,8 +15,11 @@ that lets the existing `Infradistribution` and `InfraBayesianAgent` machinery
 operate on stateful (multi-step, latent-state) environments. After this
 phase, the agent is capable of solving arbitrary causal/pseudocausal
 hypotheses representable as point-valued POMDPs, including but not limited
-to: multi-step Newcomblike problems, robust gridworlds, partially-observed
-MDPs with model uncertainty.
+to: multi-step Newcomblike problems where the predictor's behaviour is
+conditioned on the agent's policy (Transparent Newcomb with ε, Parfit's
+Hitchhiker, multi-step games against opponents that re-predict the agent's
+policy each step), robust gridworlds, partially-observed MDPs with model
+uncertainty.
 
 Throughout this document, S denotes the finite latent state space and |S| its cardinality; A denotes the 
 finite action space the agent chooses from; O denotes the finite observation space the agent receives at
@@ -24,18 +27,30 @@ each step. A supra-POMDP hypothesis is specified by four objects: an initial-sta
 giving Θ₀[s] = P(s₀ = s); a transition kernel T : S × A → ΔS with T[s, a, s'] = P(s_{t+1} = s' | s_t = s,
 a_t = a); an observation kernel B : S → ΔO with B[s, o] = P(o_t = o | s_t = s) (drawn from the
 post-transition state, per the textbook POMDP convention); and a reward function R : S × A × S → ℝ with
-R[s, a, s'] the scalar reward for transitioning from s to s' under action a. The agent maintains a belief
-state b ∈ ΔS — a probability distribution over latent states — which is updated each step via the standard
-Bayesian filter. A policy π ∈ ΔA is a (here, stochastic) action distribution. γ ∈ [0, 1) is the
-infinite-horizon discount factor used in value iteration. When multiple hypotheses are combined into a
-credal mixture, each component k carries its own (T_k, B_k, Θ₀_k, R_k) and a prior weight w_k; we write b_k
-for the per-component belief and reserve H for the Infradistribution-level credal set comprising all
-components.
+R[s, a, s'] the scalar reward for transitioning from s to s' under action a. Any of T, B, Θ₀ may
+optionally be a function of the agent's policy π — i.e., `T : Π × S × A → ΔS`,
+`B : Π × S → ΔO`, `Θ₀ : Π → ΔS` — to support Newcomb-family environments where the predictor
+conditions on π. Each kernel still returns a *single* distribution per (state, action, policy) tuple
+(point-valued); the policy enters as an extra argument, not as a source of within-hypothesis Knightian
+uncertainty. The agent maintains a belief state b ∈ ΔS — a probability distribution over latent states —
+which is updated each step via the standard Bayesian filter. A policy π ∈ ΔA is a (here, stochastic)
+action distribution. γ ∈ [0, 1) is the infinite-horizon discount factor used in value iteration. When
+multiple hypotheses are combined into a credal mixture, each component k carries its own
+(T_k, B_k, Θ₀_k, R_k) and a prior weight w_k; we write b_k for the per-component belief and reserve H for
+the Infradistribution-level credal set comprising all components.
 
 **Design commitments** (settled in conversation 2026-04-28):
 
-1. **T is policy-independent**: `T : S × A → ΔS`. Policy enters only through
-   the agent's action selection, not through the kernel itself.
+1. **T, B, and Θ₀ may each be policy-dependent**, independently. Each is
+   either a static array of the canonical shape *or* a callable that
+   takes the agent's current policy `π` (shape `(|A|,)`) and returns
+   the array of the canonical shape. A standard POMDP hypothesis uses
+   static arrays for all three. A Newcomb-family hypothesis typically
+   uses a policy-dependent `Θ₀` (the predictor commits to a prediction
+   based on `π` at episode start) and possibly a policy-dependent `T`
+   (if the predictor re-predicts each step). Reward `R` stays static.
+   Within a single hypothesis, T returns a *single* distribution over
+   next states for given (s, a, π) — point-valued, not set-valued.
 2. **T is stationary**: one shared transition matrix across timesteps. No
    `[H]` time-indexing.
 3. **Observation model `B : S → ΔO`** (POMDP textbook convention,
@@ -49,8 +64,11 @@ components.
 7. **Existing world models stay unchanged**: `MultiBernoulliWorldModel`
    and `NewcombWorldModel` are untouched.
 8. **Strict scope**: causal/pseudocausal hypotheses only. Acausal (perfect
-   Transparent Newcomb) and per-step adversarial (Appel-Kosoy RMDP) regimes
-   are explicitly out of scope; documented as known limitations.
+   Transparent Newcomb) and per-step adversarial (Appel-Kosoy halfspace
+   RMDP) regimes are explicitly out of scope; documented as known
+   limitations. Policy-dependence (#1) and set-valuedness are
+   *independent* axes — choosing point-valued does not preclude
+   policy-dependence.
 
 ---
 
@@ -137,10 +155,17 @@ parallels. Diff syntax uses `+` because every line is new.
 +        states. Initial belief state is Θ₀ from params.
 +
 +    Hypothesis params:
-+        Single hypothesis: tuple (T, B, theta_0, R) where
++        Single hypothesis: tuple (T, B, theta_0, R) where each of T, B,
++        theta_0 is either a static np.ndarray of the canonical shape OR
++        a callable `policy → np.ndarray of canonical shape` (used for
++        Newcomb-family hypotheses where the predictor conditions on
++        policy). R is always a static array.
 +            T:       shape (|S|, |A|, |S|) — T[s, a, s'] = P(s' | s, a)
++                     OR callable: policy → array of that shape
 +            B:       shape (|S|, |O|)      — B[s, o]    = P(o | s)
++                     OR callable: policy → array of that shape
 +            theta_0: shape (|S|,)          — Θ₀[s]      = P(s_0 = s)
++                     OR callable: policy → array of that shape
 +            R:       shape (|S|, |A|, |S|) — R[s, a, s'] = scalar reward
 +
 +        Mixed params (after Infradistribution.mix): list of (params, prior_weight)
@@ -199,22 +224,48 @@ caching it doesn't sacrifice any IB structure.
 +        # ... fields above ...
 +        # Cache: maps (id(component_params), hash(policy_bytes)) → V vector.
 +        # Invalidated when params identity or policy bytes change.
++        # Note: cache key already covers policy-dependent T correctly —
++        # if T is callable, V depends on policy through T, and policy
++        # is part of the key.
 +        self._v_cache: dict = {}
++
++    @staticmethod
++    def _resolve(kernel_or_fn, policy):
++        """If kernel is a callable, call it with the current policy.
++        Otherwise return as-is. Used wherever T/B/Θ₀ are read out of
++        component_params; supports policy-dependent kernels for
++        Newcomb-family hypotheses without changing the WorldModel
++        interface."""
++        return kernel_or_fn(policy) if callable(kernel_or_fn) else kernel_or_fn
 ```
 
 #### 2.2.2 `make_params` and `event_index`
 
 ```python
-+    def make_params(self, T: np.ndarray, B: np.ndarray,
-+                    theta_0: np.ndarray, R: np.ndarray):
-+        """Validate shapes and stochasticity, then bundle into a tuple."""
-+        assert T.shape == (self.num_states, self.num_actions, self.num_states)
-+        assert B.shape == (self.num_states, self.num_obs)
-+        assert theta_0.shape == (self.num_states,)
++    def make_params(self, T, B, theta_0, R: np.ndarray):
++        """Validate shapes and stochasticity, then bundle into a tuple.
++
++        T, B, and theta_0 may each be either an np.ndarray of the
++        canonical shape, or a callable `policy → np.ndarray of that
++        shape`. Static-array arguments are validated up front; callable
++        arguments are sample-validated on a uniform policy (a sanity
++        check — full validation happens lazily on first use).
++        R is always a static array.
++        """
 +        assert R.shape == (self.num_states, self.num_actions, self.num_states)
-+        assert np.allclose(T.sum(axis=2), 1), "T rows must sum to 1"
-+        assert np.allclose(B.sum(axis=1), 1), "B rows must sum to 1"
-+        assert np.isclose(theta_0.sum(), 1), "theta_0 must sum to 1"
++
++        # Validate static arrays directly; for callables, evaluate at the
++        # uniform policy and validate the result as a sanity check.
++        uniform = np.ones(self.num_actions) / self.num_actions
++        T_arr = T(uniform) if callable(T) else T
++        B_arr = B(uniform) if callable(B) else B
++        theta_0_arr = theta_0(uniform) if callable(theta_0) else theta_0
++        assert T_arr.shape == (self.num_states, self.num_actions, self.num_states)
++        assert B_arr.shape == (self.num_states, self.num_obs)
++        assert theta_0_arr.shape == (self.num_states,)
++        assert np.allclose(T_arr.sum(axis=2), 1), "T rows must sum to 1"
++        assert np.allclose(B_arr.sum(axis=1), 1), "B rows must sum to 1"
++        assert np.isclose(theta_0_arr.sum(), 1), "theta_0 must sum to 1"
 +        return (T, B, theta_0, R)
 +
 +    def event_index(self, outcome: Outcome) -> int:
@@ -303,9 +354,11 @@ need belief state per component, not per hypothesis.
 +        per-component log-marginal-likelihood tracked alongside.
 +
 +        Per-component update for one POMDP (T, B, theta_0, R):
-+            belief_pred[s']  = Σ_s belief[s] · T[s, action, s']
-+            belief_post[s']  ∝ B[s', outcome.observation] · belief_pred[s']
-+            log_marginal    += log(Σ_{s'} B[s', obs] · belief_pred[s'])
++            T_arr            = T(policy) if T is callable else T
++            B_arr            = B(policy) if B is callable else B
++            belief_pred[s']  = Σ_s belief[s] · T_arr[s, action, s']
++            belief_post[s']  ∝ B_arr[s', outcome.observation] · belief_pred[s']
++            log_marginal    += log(Σ_{s'} B_arr[s', obs] · belief_pred[s'])
 +            renormalise belief_post.
 +
 +        State shape: list[(belief_vec, log_marginal_scalar)], one tuple
@@ -315,16 +368,22 @@ need belief state per component, not per hypothesis.
 +
 +        Components are filtered independently. The credal min over
 +        components happens at the Infradistribution layer, not here.
++
++        Policy: if any of T, B, theta_0 are callables, policy is
++        required and threaded through. For purely static POMDPs the
++        policy argument is unused.
 +        """
 +        components = params if isinstance(params, list) else [(params, 1.0)]
 +        if state is None:
-+            state = [(self._initial_belief(c[0]), 0.0) for c in components]
++            state = [(self._initial_belief(c[0], policy), 0.0) for c in components]
 +        new_state = []
 +        obs = outcome.observation
 +        for (belief, log_m), (component_params, _w) in zip(state, components):
-+            T, B, _theta_0, _R = component_params
-+            belief_pred = belief @ T[:, action, :]
-+            belief_post = B[:, obs] * belief_pred
++            T_raw, B_raw, _theta_0, _R = component_params
++            T_arr = self._resolve(T_raw, policy)
++            B_arr = self._resolve(B_raw, policy)
++            belief_pred = belief @ T_arr[:, action, :]
++            belief_post = B_arr[:, obs] * belief_pred
 +            total = belief_post.sum()
 +            if total <= 0:
 +                # zero-probability observation under this component:
@@ -335,9 +394,13 @@ need belief state per component, not per hypothesis.
 +                new_state.append((belief_post / total, log_m + np.log(total)))
 +        return new_state
 +
-+    def _initial_belief(self, component_params):
-+        _T, _B, theta_0, _R = component_params
-+        return theta_0.copy()
++    def _initial_belief(self, component_params, policy=None):
++        """Initial belief for one component, resolving Θ₀ against the
++        given policy if Θ₀ is callable. Newcomb-family hypotheses use a
++        callable Θ₀ to encode 'predictor commits a prediction based on π
++        at episode start'; standard POMDPs use a static array."""
++        _T, _B, theta_0_raw, _R = component_params
++        return self._resolve(theta_0_raw, policy).copy()
 ```
 
 **Plain English**: This is the core POMDP filtering equation, applied
@@ -404,7 +467,7 @@ different downstream operation.
 +        """
 +        components = params if isinstance(params, list) else [(params, 1.0)]
 +        if belief_state is None:
-+            beliefs = [(self._initial_belief(p), 0.0) for (p, _w) in components]
++            beliefs = [(self._initial_belief(p, policy), 0.0) for (p, _w) in components]
 +        else:
 +            beliefs = belief_state
 +        weights = self._posterior_weights(beliefs, components)
@@ -413,9 +476,11 @@ different downstream operation.
 +        for (belief, _lm), (component_params, _w), weight in zip(
 +            beliefs, components, weights
 +        ):
-+            T, B, _, _ = component_params
-+            belief_pred = belief @ T[:, action, :]
-+            total += weight * float((belief_pred @ B[:, obs]))
++            T_raw, B_raw, _, _ = component_params
++            T_arr = self._resolve(T_raw, policy)
++            B_arr = self._resolve(B_raw, policy)
++            belief_pred = belief @ T_arr[:, action, :]
++            total += weight * float((belief_pred @ B_arr[:, obs]))
 +        return total
 ```
 
@@ -457,7 +522,7 @@ This is the substantive RL part. Pseudocode:
 +        """
 +        components = params if isinstance(params, list) else [(params, 1.0)]
 +        if belief_state is None:
-+            beliefs = [(self._initial_belief(p), 0.0) for (p, _w) in components]
++            beliefs = [(self._initial_belief(p, policy), 0.0) for (p, _w) in components]
 +        else:
 +            beliefs = belief_state
 +        weights = self._posterior_weights(beliefs, components)
@@ -467,17 +532,18 @@ This is the substantive RL part. Pseudocode:
 +        for (belief, _lm), (component_params, _w), credal_weight in zip(
 +            beliefs, components, weights
 +        ):
-+            T, B, _theta_0, R = component_params
++            T_raw, _B, _theta_0, R = component_params
++            T_arr = self._resolve(T_raw, policy)
 +            # one-step Q-value at this belief, action under policy π for
 +            # subsequent steps. We approximate the belief-state MDP's
 +            # value function V(b) by collapsing to the underlying
 +            # state-MDP value V(s), then projecting V_b = b @ V_s.
 +            cache_key = None if policy_key is None else (id(component_params), policy_key)
-+            V_s = self._value_iteration(T, R, policy, cache_key=cache_key)
++            V_s = self._value_iteration(T_arr, R, policy, cache_key=cache_key)
 +            # Q(b, a) = Σ_{s} b[s] · Σ_{s'} T[s,a,s'] · (R[s,a,s'] + γ V[s'])
-+            R_sa = (T[:, action, :] * R[:, action, :]).sum(axis=1)  # shape (|S|,)
-+            EV = T[:, action, :] @ V_s                              # shape (|S|,)
-+            Q_sa = R_sa + self.discount * EV                        # shape (|S|,)
++            R_sa = (T_arr[:, action, :] * R[:, action, :]).sum(axis=1)  # shape (|S|,)
++            EV = T_arr[:, action, :] @ V_s                              # shape (|S|,)
++            Q_sa = R_sa + self.discount * EV                            # shape (|S|,)
 +            total += credal_weight * float(belief @ Q_sa)
 +        return total
 +
@@ -864,6 +930,53 @@ def test_compute_expected_reward_credal_average():
     """Mixed hypothesis: expected_reward = Σ_k posterior_weight[k] · E_k."""
 ```
 
+### 3.8 Policy-dependent kernels (Newcomb-family support)
+
+```python
+def test_make_params_accepts_callable_theta_0():
+    """Θ₀ as a callable π → array of shape (|S|,) is accepted and
+    sample-validated against the uniform policy."""
+
+def test_make_params_accepts_callable_T():
+    """T as a callable π → array of shape (|S|, |A|, |S|) is accepted
+    and sample-validated against the uniform policy."""
+
+def test_make_params_rejects_callable_theta_0_with_wrong_output_shape():
+    """A callable that returns the wrong shape on the uniform policy
+    must fail the sanity check at make_params time."""
+
+def test_initial_belief_uses_callable_theta_0_with_current_policy():
+    """For a Newcomb-style hypothesis where Θ₀(π) = π (predictor's
+    prediction is exactly the agent's policy), verify _initial_belief
+    returns the policy as the initial state distribution."""
+
+def test_update_state_uses_callable_theta_0_on_lazy_init():
+    """First update_state call from None state with a callable Θ₀ uses
+    the supplied policy to construct the initial belief."""
+
+def test_update_state_uses_callable_T_each_step():
+    """If T is a callable π → array, update_state evaluates it with the
+    current policy at each step. Construct two policies producing
+    different T(π); verify the belief filter behaviour matches the
+    policy-resolved T."""
+
+def test_compute_likelihood_uses_callable_T_and_B():
+    """compute_likelihood with callable T (and/or B) marginalises over
+    the policy-resolved kernels. Hand-verify against direct computation."""
+
+def test_value_iteration_cache_invalidates_on_policy_change_with_callable_T():
+    """If T is a callable π → array, two value-iteration calls with
+    different policies must produce different V (and the cache must hit
+    on a third call with a previously-seen policy). Sanity check that
+    policy-dependent T does not silently collapse to a stale V."""
+
+def test_transparent_newcomb_with_epsilon_one_step_likelihood():
+    """Construct a Transparent-Newcomb-with-ε hypothesis where Θ₀(π) =
+    (1-ε)·π + ε·uniform — predictor predicts agent's policy with ε
+    error. Verify the likelihood of observing 'box full' under
+    one-boxing policy is approximately 1-ε."""
+```
+
 ---
 
 ## 4. Tier 2 — Integration with `Infradistribution`
@@ -971,10 +1084,19 @@ def test_supra_pomdp_tiger_listens_before_committing():
 
 ```python
 def test_supra_pomdp_transparent_newcomb_with_epsilon():
-    """Transparent Newcomb with ε=0.05, encoded as a 2-state
-    supra-POMDP. Verify the agent's terminal policy is one-box-on-full
-    (i.e. action probability for one-box conditional on the full-box
-    observation is > 0.9 after 200 episodes)."""
+    """Transparent Newcomb with ε=0.05, encoded as a 2-state supra-POMDP
+    with a *policy-dependent* Θ₀.
+
+    Latent states: {predicted_one_box, predicted_two_box}.
+    Observations: {full, empty} (deterministic from latent state).
+    Θ₀(π) = (1 - ε) · π + ε · uniform — predictor predicts agent's
+        observation-conditional policy with ε error. This is the
+        canonical encoding of Transparent Newcomb at the supra-POMDP
+        level, and uses the callable-Θ₀ feature added in §2.2.
+
+    Verify the agent's terminal policy is one-box-on-full (i.e. action
+    probability for one-box conditional on the full-box observation is
+    > 0.9 after 200 episodes)."""
 ```
 
 ---
@@ -1010,6 +1132,14 @@ def test_supra_pomdp_transparent_newcomb_with_epsilon():
 5. **Acausal hypotheses (perfect Transparent Newcomb) and per-step
    adversarial transitions are out of scope.** Documented in the class
    docstring with a pointer to `20260427_phase3_supra_pomdp_research.md`.
+   Note: *policy-dependent* kernels are supported via the
+   optional-callable mechanism on T, B, and Θ₀ (see §2.2.1, §2.2.2,
+   §2.2.5) — this covers the causal/pseudocausal Newcomb-family,
+   including Transparent Newcomb with ε. *Set-valued* kernels remain
+   out of scope because they require a different data structure
+   altogether (infrakernels), not just a function-of-π. Policy-dependence
+   and set-valuedness are independent axes; the choice of point-valued
+   T does not preclude policy-dependence.
 
 6. **Baselines for the experiments report (`BayesianRLAgent`,
    `QLearningAgent`) are not part of this plan.** See §2.2.9. The
@@ -1053,7 +1183,7 @@ def test_supra_pomdp_transparent_newcomb_with_epsilon():
 | `ibrl/infrabayesian/world_models/base.py` | Moved from `world_model.py` | 0 (move only) |
 | `ibrl/infrabayesian/world_models/bernoulli_world_model.py` | Update import only | 1 |
 | `ibrl/infrabayesian/world_models/newcomb_world_model.py` | Update import only | 1 |
-| `ibrl/infrabayesian/world_models/supra_pomdp_world_model.py` | New | ~170 (incl. cache) |
+| `ibrl/infrabayesian/world_models/supra_pomdp_world_model.py` | New | ~190 (incl. cache + `_resolve` for policy-dependent kernels) |
 | `ibrl/infrabayesian/world_model.py` | Deleted (or one-line shim) | 0 |
 | `ibrl/outcome.py` | Field rename `env_action`→`observation` | 1 |
 | `ibrl/environments/*.py` | Field rename in 5–6 files | ~15 |
@@ -1061,7 +1191,7 @@ def test_supra_pomdp_transparent_newcomb_with_epsilon():
 | `ibrl/infrabayesian/a_measure.py` | Unchanged | 0 |
 | `ibrl/infrabayesian/infradistribution.py` | Unchanged | 0 |
 | `ibrl/agents/infrabayesian.py` | Unchanged | 0 |
-| `tests/test_supra_pomdp_world_model.py` | New (Tier 1) | ~250 |
+| `tests/test_supra_pomdp_world_model.py` | New (Tier 1; incl. policy-dependent kernel tests §3.8) | ~310 |
 | `tests/test_supra_pomdp_integration.py` | New (Tier 2) | ~120 |
 | `tests/test_supra_pomdp_agent.py` | New (Tier 3) | ~200 |
 
@@ -1069,4 +1199,4 @@ def test_supra_pomdp_transparent_newcomb_with_epsilon():
 
 ## 9. Relationship to the canonical supra-POMDP formalism
 
-For posterity. The canonical formalism of crisp supra-POMDPs — `(S, Θ₀, A, O, T, B, L, γ)` with set-valued transition `T : S × A → □S`, deterministic observation map `B : S → O`, credal initial state `Θ₀ ∈ □S`, loss `L : S × A → [0, 1]` — is laid out in Gelb (2025), [*Crisp Supra-Decision Processes*](https://www.greaterwrong.com/posts/mt82ZhdEsfh6CNYse/crisp-supra-decision-processes). What this plan implements is **not** literally a crisp supra-POMDP — `T` here is point-valued per hypothesis, `B` is stochastic `S → ΔO`, `Θ₀` is point-valued `ΔS` per hypothesis, and reward is `R : S × A × S → ℝ`. What we implement is a **finite credal mixture of ordinary point-valued POMDPs**, with the credal set living at the hypothesis-class level (across `Infradistribution.mix`) rather than inside any single kernel. By Proposition 2 of Gelb (2025), this is *formally equivalent* to a crisp supra-POMDP via the construction `S' := E × (A×O)*` (states are environment-history pairs); the equivalent supra-POMDP would in our case be **polytopic** (each `T'(s, a)` is the closed convex hull of finitely many distributions, since our hypothesis class is finite). We do not construct the equivalent supra-POMDP explicitly — it is a theoretical bridge, not an in-memory data structure. The bridge is what justifies our planning approach: per-component value iteration plus the worst-case `min` over a-measures at the Infradistribution layer is the polytopic special case of the infra-Bellman equation `V*(s) = min_a max_{θ ∈ T(s,a)} [L(s,a) + γ E_{s'∼θ}[V*(s')]]`, since the `max` over a closed convex polytope reduces to a `max` over its (finitely many) vertices, which are exactly the point-valued component POMDPs in our mixture. The deviations from the canonical formalism are either strictly more general than the canonical version (`B : S → ΔO` and `R(s, a, s')` both subsume their canonical counterparts) or equivalent up to where the credal set is materialised (`T` and `Θ₀`); none compromise the formal correspondence. The class is named `SupraPOMDPWorldModel` because the user-facing concept it implements is supra-POMDP-equivalent in this precise sense.
+For posterity. The canonical formalism of crisp supra-POMDPs — `(S, Θ₀, A, O, T, B, L, γ)` with set-valued transition `T : S × A → □S`, deterministic observation map `B : S → O`, credal initial state `Θ₀ ∈ □S`, loss `L : S × A → [0, 1]` — is laid out in Gelb (2025), [*Crisp Supra-Decision Processes*](https://www.greaterwrong.com/posts/mt82ZhdEsfh6CNYse/crisp-supra-decision-processes). What this plan implements is **not** literally a crisp supra-POMDP — `T` here is point-valued per hypothesis, `B` is stochastic `S → ΔO`, `Θ₀` is point-valued `ΔS` per hypothesis, and reward is `R : S × A × S → ℝ`. What we implement is a **finite credal mixture of ordinary point-valued POMDPs**, with the credal set living at the hypothesis-class level (across `Infradistribution.mix`) rather than inside any single kernel. By Proposition 2 of Gelb (2025), this is *formally equivalent* to a crisp supra-POMDP via the construction `S' := E × (A×O)*` (states are environment-history pairs); the equivalent supra-POMDP would in our case be **polytopic** (each `T'(s, a)` is the closed convex hull of finitely many distributions, since our hypothesis class is finite). We do not construct the equivalent supra-POMDP explicitly — it is a theoretical bridge, not an in-memory data structure. The bridge is what justifies our planning approach: per-component value iteration plus the worst-case `min` over a-measures at the Infradistribution layer is the polytopic special case of the infra-Bellman equation `V*(s) = min_a max_{θ ∈ T(s,a)} [L(s,a) + γ E_{s'∼θ}[V*(s')]]`, since the `max` over a closed convex polytope reduces to a `max` over its (finitely many) vertices, which are exactly the point-valued component POMDPs in our mixture. The deviations from the canonical formalism are either strictly more general than the canonical version (`B : S → ΔO` and `R(s, a, s')` both subsume their canonical counterparts) or equivalent up to where the credal set is materialised (`T` and `Θ₀`); none compromise the formal correspondence. **Policy-dependence is a separate axis from set-valuedness**: our T, B, and Θ₀ may each optionally be functions of `π` (see §0 commitment #1), which lets us encode Bell et al.'s NDPs and the causal/pseudocausal Newcomb-family inside a credal mixture of point-valued kernels. Set-valuedness (the orthogonal axis) is what we'd need to additionally capture per-step adversarial transitions à la Appel-Kosoy halfspace RMDPs; that remains out of scope. The class is named `SupraPOMDPWorldModel` because the user-facing concept it implements is supra-POMDP-equivalent in this precise sense.
