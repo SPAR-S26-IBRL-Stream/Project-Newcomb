@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass
 
-from ..world_model import WorldModel
+from .base import WorldModel
 from ...outcome import Outcome
 
 # Representation of hypothesis parameters of Newcomb world model
@@ -68,7 +68,8 @@ class NewcombWorldModel(WorldModel):
     def update_state(self, state,
             outcome : Outcome,
             action : int,
-            policy : np.ndarray):
+            policy : np.ndarray,
+            params=None):
         pass
 
     def is_initial(self, state) -> bool:

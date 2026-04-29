@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass
 
-from ..world_model import WorldModel
+from .base import WorldModel
 from ...outcome import Outcome
 
 
@@ -91,7 +91,8 @@ class MultiBernoulliWorldModel(WorldModel):
             state: BernoulliWorldModelBeliefState,
             outcome: Outcome,
             action: int,
-            policy: np.ndarray) -> BernoulliWorldModelBeliefState:
+            policy: np.ndarray,
+            params=None) -> BernoulliWorldModelBeliefState:
         new_state = BernoulliWorldModelBeliefState(state.history.copy())
         new_state.history[action, self.event_index(outcome, action)] += 1
         return new_state

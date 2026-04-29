@@ -47,12 +47,12 @@ class BaseEnvironment(ABC):
         Returns:
             Outcome containing the reward and any environment action
         """
-        env_action = self._respond(probabilities)
-        reward = self._resolve(env_action, action)
-        return Outcome(reward=reward, env_action=env_action)
+        observation = self._respond(probabilities)
+        reward = self._resolve(observation, action)
+        return Outcome(reward=reward, observation=observation)
 
     def _respond(self, probabilities : np.ndarray) -> int | None:
-        """Environment's move given the agent's policy. Override in subclasses.
+        """Environment's observation given the agent's policy. Override in subclasses.
 
         For Newcomb-like environments, this is where the predictor samples its
         prediction. For standard bandits, returns None.
@@ -60,7 +60,7 @@ class BaseEnvironment(ABC):
         return None
 
     @abstractmethod
-    def _resolve(self, env_action : int | None, action : int) -> float | tuple[float,int]:
+    def _resolve(self, observation : int | None, action : int) -> float | tuple[float,int]:
         """Determine the reward given both moves. Override in subclasses.
         """
         pass
