@@ -13,7 +13,9 @@ import pytest
 
 from ibrl.infrabayesian.a_measure import AMeasure
 from ibrl.infrabayesian.infradistribution import Infradistribution
-from ibrl.infrabayesian.world_models.supra_pomdp_world_model import SupraPOMDPWorldModel
+from ibrl.infrabayesian.world_models.supra_pomdp_world_model import (
+    SupraPOMDPWorldModel, SupraPOMDPWorldModelBeliefState
+)
 from ibrl.agents.supra_pomdp_agent import SupraPOMDPAgent
 from ibrl.outcome import Outcome
 
@@ -111,7 +113,7 @@ def test_supra_pomdp_gridworld_known_trap_avoids_it():
         exploration_prefix=0,
     )
     agent.reset()
-    Q = wm.compute_q_values(None, params, policy=np.array([1.0]))
+    Q = wm.compute_q_values(wm.initial_state(), params, policy=np.array([1.0]))
     # V[trap] should be negative; agent should be aware of trap via Q-values
     assert Q[0] < 0 or True  # with a single forced action, just check no crash
 
@@ -149,7 +151,7 @@ def test_supra_pomdp_credal_mixture_pessimistic_over_traps():
     wm_ref = dist.world_model
 
     # The mixed hypothesis (Bayesian avg): expected Q ≈ 0
-    Q_mix = wm_ref.compute_q_values(None, dist.measures[0].params,
+    Q_mix = wm_ref.compute_q_values(wm_ref.initial_state(), dist.measures[0].params,
                                      policy=np.array([1.0]))
     assert abs(Q_mix[0]) < 0.5, f"Bayesian avg Q should be ≈ 0, got {Q_mix[0]}"
 
@@ -184,7 +186,7 @@ def test_supra_pomdp_tiger_q_values_favour_listen():
 
     # Under a uniform policy, Q-values are reasonable
     policy = np.array([1/3, 1/3, 1/3])
-    Q = wm.compute_q_values(None, params, policy=policy)
+    Q = wm.compute_q_values(wm.initial_state(), params, policy=policy)
     # Listen (action 2) should have higher Q than open from symmetric belief
     assert Q[2] > Q[0], f"listen Q={Q[2]} should exceed open_left Q={Q[0]}"
     assert Q[2] > Q[1], f"listen Q={Q[2]} should exceed open_right Q={Q[1]}"

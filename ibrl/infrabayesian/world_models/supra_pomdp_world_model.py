@@ -2,25 +2,51 @@
 from __future__ import annotations
 
 import numpy as np
+from dataclasses import dataclass
 
 from .base import WorldModel
 from ...outcome import Outcome
+
+
+# Representation of hypothesis parameters and belief state of Supra POMDP world model
+
+@dataclass
+class SupraPOMDPWorldModelParameters:
+    """
+    Parameters of a single POMDP hypothesis.
+        T:       shape (|S|, |A|, |S|) or callable policy → that shape
+        B:       shape (|S|, |O|)      or callable policy → that shape
+        theta_0: shape (|S|,)          or callable policy → that shape
+        R:       shape (|S|, |A|, |S|) — always static
+    """
+    T: np.ndarray | callable
+    B: np.ndarray | callable
+    theta_0: np.ndarray | callable
+    R: np.ndarray
+
+@dataclass
+class SupraPOMDPWorldModelBeliefState:
+    """
+    Belief state of Supra POMDP world model: list of (belief_vec, log_marginal) per component,
+    or None before the first update (lazy initialization).
+    """
+    components: list[tuple[np.ndarray, float]] | None
 
 
 class SupraPOMDPWorldModel(WorldModel):
     """
     World model for a stateful POMDP with optional policy-dependent kernels.
 
-    Belief state: list of (belief_vec, log_marginal) per hypothesis component,
-        or None before the first update.
+    Belief state: SupraPOMDPWorldModelBeliefState containing list of (belief_vec, log_marginal)
+        per hypothesis component, or None before the first update.
 
-    Hypothesis params — single hypothesis: tuple (T, B, theta_0, R) where
+    Hypothesis params — single hypothesis: SupraPOMDPWorldModelParameters with fields:
         T:       shape (|S|, |A|, |S|) or callable policy → that shape
         B:       shape (|S|, |O|)      or callable policy → that shape
         theta_0: shape (|S|,)          or callable policy → that shape
         R:       shape (|S|, |A|, |S|) — always static
 
-    Mixed params (after Infradistribution.mix): list of (params, prior_weight).
+    Mixed params (after Infradistribution.mix): list of (SupraPOMDPWorldModelParameters, prior_weight).
 
     Construct params via make_params(T, B, theta_0, R).
 
@@ -51,8 +77,8 @@ class SupraPOMDPWorldModel(WorldModel):
 
     # ── Param construction ────────────────────────────────────────────────────
 
-    def make_params(self, T, B, theta_0, R: np.ndarray):
-        """Validate shapes and stochasticity, then bundle into a tuple.
+    def make_params(self, T, B, theta_0, R: np.ndarray) -> SupraPOMDPWorldModelParameters:
+        """Validate shapes and stochasticity, then bundle into a parameter object.
 
         T, B, and theta_0 may each be an np.ndarray of the canonical shape
         or a callable policy → np.ndarray of that shape. Callables are
@@ -75,12 +101,12 @@ class SupraPOMDPWorldModel(WorldModel):
         assert np.allclose(B_arr.sum(axis=1), 1),  "B rows must sum to 1"
         assert np.isclose(th0_arr.sum(), 1),        "theta_0 must sum to 1"
 
-        return (T, B, theta_0, R)
+        return SupraPOMDPWorldModelParameters(T, B, theta_0, R)
 
-    def mix_params(self, params_list: list, coefficients: np.ndarray):
+    def mix_params(self, params_list: list, coefficients: np.ndarray) -> list:
         """Mix point-valued POMDP hypotheses into a credal mixture.
 
-        Returns list of (params, prior_weight) tuples. Flattens nested mixtures.
+        Returns list of (SupraPOMDPWorldModelParameters, prior_weight) tuples. Flattens nested mixtures.
         """
         components = []
         for p, c in zip(params_list, coefficients):
@@ -96,37 +122,37 @@ class SupraPOMDPWorldModel(WorldModel):
 
     # ── Belief state ──────────────────────────────────────────────────────────
 
-    def initial_state(self):
-        return None
+    def initial_state(self) -> SupraPOMDPWorldModelBeliefState:
+        return SupraPOMDPWorldModelBeliefState(None)
 
-    def is_initial(self, state) -> bool:
-        return state is None
+    def is_initial(self, state: SupraPOMDPWorldModelBeliefState) -> bool:
+        return state.components is None
 
-    def _initial_belief(self, component_params, policy=None) -> np.ndarray:
+    def _initial_belief(self, component_params: SupraPOMDPWorldModelParameters, policy=None) -> np.ndarray:
         """Initial belief for one component, resolving θ₀ against policy."""
-        _T, _B, theta_0_raw, _R = component_params
-        return self._resolve(theta_0_raw, policy).copy()
+        return self._resolve(component_params.theta_0, policy).copy()
 
     # ── Bayesian filter ───────────────────────────────────────────────────────
 
-    def update_state(self, state, outcome: Outcome, action: int,
-                     policy: np.ndarray, params=None):
+    def update_state(self, state: SupraPOMDPWorldModelBeliefState, outcome: Outcome, action: int,
+                     policy: np.ndarray, params=None) -> SupraPOMDPWorldModelBeliefState:
         """Standard POMDP Bayesian filter applied per component.
 
-        State: list[(belief_vec, log_marginal)], one per component.
-        Lazily initialises from θ₀ when state is None.
+        State: SupraPOMDPWorldModelBeliefState containing list of (belief_vec, log_marginal) per component.
+        Lazily initialises from θ₀ when state.components is None.
         """
         components = params if isinstance(params, list) else [(params, 1.0)]
-        if state is None:
-            state = [(self._initial_belief(cp, policy), 0.0)
-                     for cp, _w in components]
+        if state.components is None:
+            state_components = [(self._initial_belief(cp, policy), 0.0)
+                               for cp, _w in components]
+        else:
+            state_components = state.components
 
         obs_idx = outcome.observation
         new_state = []
-        for (belief, log_m), (component_params, _w) in zip(state, components):
-            T_raw, B_raw, _theta_0, _R = component_params
-            T_arr = self._resolve(T_raw, policy)
-            B_arr = self._resolve(B_raw, policy)
+        for (belief, log_m), (component_params, _w) in zip(state_components, components):
+            T_arr = self._resolve(component_params.T, policy)
+            B_arr = self._resolve(component_params.B, policy)
 
             belief_pred = belief @ T_arr[:, action, :]   # shape (|S|,)
             belief_post = B_arr[:, obs_idx] * belief_pred
@@ -137,11 +163,11 @@ class SupraPOMDPWorldModel(WorldModel):
             else:
                 new_state.append((belief_post / total, log_m + np.log(total)))
 
-        return new_state
+        return SupraPOMDPWorldModelBeliefState(new_state)
 
-    def _posterior_weights(self, state, params) -> np.ndarray:
+    def _posterior_weights(self, state: SupraPOMDPWorldModelBeliefState, params) -> np.ndarray:
         """Posterior weights: weights[k] ∝ prior_weight[k] · P(history|k)."""
-        log_marginals  = np.array([lm for _b, lm in state])
+        log_marginals  = np.array([lm for _b, lm in state.components])
         prior_log_w    = np.log([w  for _,  w in params])
         log_w = prior_log_w + log_marginals
         log_w -= log_w.max()
@@ -150,25 +176,26 @@ class SupraPOMDPWorldModel(WorldModel):
 
     # ── IB likelihood (one-step, used by Infradistribution.update) ───────────
 
-    def compute_likelihood(self, belief_state, outcome: Outcome, params,
+    def compute_likelihood(self, belief_state: SupraPOMDPWorldModelBeliefState, outcome: Outcome, params,
                            action: int, policy=None) -> float:
         """P(observation | belief, action) averaged over components by posterior weights."""
         components = params if isinstance(params, list) else [(params, 1.0)]
-        beliefs = (
-            [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
-            if belief_state is None else belief_state
-        )
+        if belief_state.components is None:
+            belief_components = [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
+            beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
+        else:
+            beliefs = belief_state
         weights  = self._posterior_weights(beliefs, components)
         obs_idx  = outcome.observation
         total    = 0.0
-        for (belief, _lm), (cp, _w), weight in zip(beliefs, components, weights):
-            T_arr = self._resolve(cp[0], policy)
-            B_arr = self._resolve(cp[1], policy)
+        for (belief, _lm), (component_params, _w), weight in zip(beliefs.components, components, weights):
+            T_arr = self._resolve(component_params.T, policy)
+            B_arr = self._resolve(component_params.B, policy)
             belief_pred = belief @ T_arr[:, action, :]
             total += weight * float(belief_pred @ B_arr[:, obs_idx])
         return total
 
-    def compute_expected_reward(self, belief_state, reward_function: np.ndarray,
+    def compute_expected_reward(self, belief_state: SupraPOMDPWorldModelBeliefState, reward_function: np.ndarray,
                                 params, action: int, policy=None) -> float:
         """E[reward_function[next_obs] | belief, action] — one-step expectation.
 
@@ -177,15 +204,16 @@ class SupraPOMDPWorldModel(WorldModel):
         multi-step planning.
         """
         components = params if isinstance(params, list) else [(params, 1.0)]
-        beliefs = (
-            [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
-            if belief_state is None else belief_state
-        )
+        if belief_state.components is None:
+            belief_components = [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
+            beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
+        else:
+            beliefs = belief_state
         weights = self._posterior_weights(beliefs, components)
         total   = 0.0
-        for (belief, _lm), (cp, _w), weight in zip(beliefs, components, weights):
-            T_arr = self._resolve(cp[0], policy)
-            B_arr = self._resolve(cp[1], policy)
+        for (belief, _lm), (component_params, _w), weight in zip(beliefs.components, components, weights):
+            T_arr = self._resolve(component_params.T, policy)
+            B_arr = self._resolve(component_params.B, policy)
             # E[rf[next_obs]] = b @ T[:,a,:] @ B @ rf
             belief_pred = belief @ T_arr[:, action, :]          # (|S|,)
             total += weight * float(belief_pred @ (B_arr @ reward_function))
@@ -193,7 +221,7 @@ class SupraPOMDPWorldModel(WorldModel):
 
     # ── Planning (multi-step, used by SupraPOMDPAgent._expected_rewards) ─────
 
-    def compute_q_values(self, belief_state, params,
+    def compute_q_values(self, belief_state: SupraPOMDPWorldModelBeliefState, params,
                          policy: np.ndarray | None = None) -> np.ndarray:
         """Multi-step Q-values Q(b, a) for each action under policy π.
 
@@ -204,20 +232,21 @@ class SupraPOMDPWorldModel(WorldModel):
         Returns np.ndarray of shape (num_actions,).
         """
         components = params if isinstance(params, list) else [(params, 1.0)]
-        beliefs = (
-            [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
-            if belief_state is None else belief_state
-        )
+        if belief_state.components is None:
+            belief_components = [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
+            beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
+        else:
+            beliefs = belief_state
         weights     = self._posterior_weights(beliefs, components)
         policy_key  = None if policy is None else policy.tobytes()
         Q_total     = np.zeros(self.num_actions)
 
-        for (belief, _lm), (cp, _w), credal_weight in zip(beliefs, components, weights):
-            T_raw = cp[0]; R = cp[3]
-            T_arr = self._resolve(T_raw, policy)
+        for (belief, _lm), (component_params, _w), credal_weight in zip(beliefs.components, components, weights):
+            T_arr = self._resolve(component_params.T, policy)
+            R = component_params.R
 
             cache_key = (
-                None if policy_key is None else (id(cp), policy_key)
+                None if policy_key is None else (id(component_params), policy_key)
             )
             V_s = self._value_iteration(T_arr, R, policy, cache_key=cache_key)
 
