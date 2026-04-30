@@ -140,7 +140,7 @@ class SupraPOMDPWorldModel(WorldModel):
         return new_state
 
     def _posterior_weights(self, state, params) -> np.ndarray:
-        """Posterior credal weights: weights[k] ∝ prior_weight[k] · P(history|k)."""
+        """Posterior weights: weights[k] ∝ prior_weight[k] · P(history|k)."""
         log_marginals  = np.array([lm for _b, lm in state])
         prior_log_w    = np.log([w  for _,  w in params])
         log_w = prior_log_w + log_marginals
@@ -197,7 +197,7 @@ class SupraPOMDPWorldModel(WorldModel):
                          policy: np.ndarray | None = None) -> np.ndarray:
         """Multi-step Q-values Q(b, a) for each action under policy π.
 
-        Runs value iteration per component, weighted by posterior credal weights.
+        Runs value iteration per component, weighted by posterior mixture weights.
         The candidate policy π is threaded into policy-dependent kernels so
         that Newcomb-family predictors see the correct committed policy.
 

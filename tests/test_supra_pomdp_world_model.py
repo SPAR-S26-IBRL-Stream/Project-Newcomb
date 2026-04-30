@@ -161,7 +161,7 @@ def test_update_state_does_not_mutate_input_state():
     assert state0[0][1] == log_m_before
 
 
-# ── §3.4  Mixed params and credal weights ─────────────────────────────────────
+# ── §3.4  Mixed params and posterior mixture weights  ─────────────────────────────────────
 
 def _make_2state_params(wm, theta_0_vec):
     """Helper: identity T, identity B, specified θ₀."""
