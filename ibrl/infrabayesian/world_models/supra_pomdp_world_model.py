@@ -123,14 +123,14 @@ class SupraPOMDPWorldModel(WorldModel):
     def is_initial(self, state: SupraPOMDPWorldModelBeliefState) -> bool:
         return state.components is None
 
-    def _initial_belief(self, theta_0, policy=None) -> np.ndarray:
+    def _initial_belief(self, theta_0, policy) -> np.ndarray:
         """Initial belief for one component, resolving θ₀ against policy."""
         return self._resolve(theta_0, policy).copy()
 
     # ── Bayesian filter ───────────────────────────────────────────────────────
 
     def update_state(self, state: SupraPOMDPWorldModelBeliefState, outcome: Outcome, action: int,
-                     policy: np.ndarray, params: SupraPOMDPWorldModelParameters = None) -> SupraPOMDPWorldModelBeliefState:
+                     policy: np.ndarray, params: SupraPOMDPWorldModelParameters) -> SupraPOMDPWorldModelBeliefState:
         """Standard POMDP Bayesian filter applied per component.
 
         State: SupraPOMDPWorldModelBeliefState containing list of (belief_vec, log_marginal) per component.
@@ -172,7 +172,7 @@ class SupraPOMDPWorldModel(WorldModel):
 
     def compute_likelihood(self, belief_state: SupraPOMDPWorldModelBeliefState, outcome: Outcome,
                            params: SupraPOMDPWorldModelParameters,
-                           action: int, policy=None) -> float:
+                           action: int, policy) -> float:
         """P(observation | belief, action) averaged over components by posterior weights."""
         if belief_state.components is None:
             belief_components = [(self._initial_belief(th0_k, policy), 0.0)
@@ -193,7 +193,7 @@ class SupraPOMDPWorldModel(WorldModel):
     def compute_expected_reward(self, belief_state: SupraPOMDPWorldModelBeliefState,
                                 reward_function: np.ndarray,
                                 params: SupraPOMDPWorldModelParameters,
-                                action: int, policy=None) -> float:
+                                action: int, policy) -> float:
         """E[reward_function[next_obs] | belief, action] — one-step expectation.
 
         Used by Infradistribution.update for IB normalisation (the gluing
@@ -220,7 +220,7 @@ class SupraPOMDPWorldModel(WorldModel):
 
     def compute_q_values(self, belief_state: SupraPOMDPWorldModelBeliefState,
                          params: SupraPOMDPWorldModelParameters,
-                         policy: np.ndarray | None = None) -> np.ndarray:
+                         policy: np.ndarray) -> np.ndarray:
         """Multi-step Q-values Q(b, a) for each action under policy π.
 
         Runs value iteration per component, weighted by posterior mixture weights.
