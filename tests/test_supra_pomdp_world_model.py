@@ -222,9 +222,7 @@ def test_posterior_weights_at_initial_state_equal_prior():
                              params=mixed_params)
     # After one obs the weights are not equal to prior; test BEFORE first obs
     # by constructing the initial beliefs manually
-    initial_beliefs = SupraPOMDPWorldModelBeliefState(
-        [(wm._initial_belief(th0_k, None), 0.0) for th0_k in mixed_params.theta_0]
-    )
+    initial_beliefs = wm._initial_belief(mixed_params, None)
     weights = wm._posterior_weights(initial_beliefs, mixed_params)
     np.testing.assert_allclose(weights, [0.6, 0.4], atol=1e-9)
 
@@ -542,7 +540,7 @@ def test_initial_belief_uses_callable_theta_0_with_policy():
     params = wm.make_params(T, B, theta_0_fn, R)
 
     policy = np.array([0.8, 0.2])
-    belief = wm._initial_belief(params.theta_0[0], policy=policy)
+    belief = wm._initial_belief(params, policy=policy).components[0][0]
     np.testing.assert_allclose(belief, [0.8, 0.2])
 
 

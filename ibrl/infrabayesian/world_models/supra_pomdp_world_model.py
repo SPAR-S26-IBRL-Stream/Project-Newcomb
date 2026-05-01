@@ -123,9 +123,13 @@ class SupraPOMDPWorldModel(WorldModel):
     def is_initial(self, state: SupraPOMDPWorldModelBeliefState) -> bool:
         return state.components is None
 
-    def _initial_belief(self, theta_0, policy) -> np.ndarray:
-        """Initial belief for one component, resolving θ₀ against policy."""
-        return self._resolve(theta_0, policy).copy()
+    def _initial_belief(self, params: SupraPOMDPWorldModelParameters,
+                        policy) -> SupraPOMDPWorldModelBeliefState:
+        """Initial belief state for all components, resolving each θ₀ against policy."""
+        return SupraPOMDPWorldModelBeliefState([
+            (self._resolve(th0_k, policy).copy(), 0.0)
+            for th0_k in params.theta_0
+        ])
 
     # ── Bayesian filter ───────────────────────────────────────────────────────
 
@@ -136,11 +140,8 @@ class SupraPOMDPWorldModel(WorldModel):
         State: SupraPOMDPWorldModelBeliefState containing list of (belief_vec, log_marginal) per component.
         Lazily initialises from θ₀ when state.components is None.
         """
-        if state.components is None:
-            state_components = [(self._initial_belief(th0_k, policy), 0.0)
-                                for th0_k in params.theta_0]
-        else:
-            state_components = state.components
+        state_components = (self._initial_belief(params, policy).components
+                            if state.components is None else state.components)
 
         obs_idx = outcome.observation
         new_state = []
@@ -174,12 +175,7 @@ class SupraPOMDPWorldModel(WorldModel):
                            params: SupraPOMDPWorldModelParameters,
                            action: int, policy) -> float:
         """P(observation | belief, action) averaged over components by posterior weights."""
-        if belief_state.components is None:
-            belief_components = [(self._initial_belief(th0_k, policy), 0.0)
-                                 for th0_k in params.theta_0]
-            beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
-        else:
-            beliefs = belief_state
+        beliefs = self._initial_belief(params, policy) if belief_state.components is None else belief_state
         weights = self._posterior_weights(beliefs, params)
         obs_idx = outcome.observation
         total   = 0.0
@@ -200,12 +196,7 @@ class SupraPOMDPWorldModel(WorldModel):
         operator). Does NOT run value iteration. See compute_q_values for
         multi-step planning.
         """
-        if belief_state.components is None:
-            belief_components = [(self._initial_belief(th0_k, policy), 0.0)
-                                 for th0_k in params.theta_0]
-            beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
-        else:
-            beliefs = belief_state
+        beliefs = self._initial_belief(params, policy) if belief_state.components is None else belief_state
         weights = self._posterior_weights(beliefs, params)
         total   = 0.0
         for (belief, _lm), T_k, B_k, weight in zip(beliefs.components, params.T, params.B, weights):
@@ -229,12 +220,7 @@ class SupraPOMDPWorldModel(WorldModel):
 
         Returns np.ndarray of shape (num_actions,).
         """
-        if belief_state.components is None:
-            belief_components = [(self._initial_belief(th0_k, policy), 0.0)
-                                 for th0_k in params.theta_0]
-            beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
-        else:
-            beliefs = belief_state
+        beliefs    = self._initial_belief(params, policy) if belief_state.components is None else belief_state
         weights    = self._posterior_weights(beliefs, params)
         policy_key = None if policy is None else policy.tobytes()
         Q_total    = np.zeros(self.num_actions)
