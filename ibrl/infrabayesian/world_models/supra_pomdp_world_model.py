@@ -175,16 +175,9 @@ class SupraPOMDPWorldModel(WorldModel):
                            params: SupraPOMDPWorldModelParameters,
                            action: int, policy) -> float:
         """P(observation | belief, action) averaged over components by posterior weights."""
-        beliefs = self._initial_belief(params, policy) if belief_state.components is None else belief_state
-        weights = self._posterior_weights(beliefs, params)
-        obs_idx = outcome.observation
-        total   = 0.0
-        for (belief, _lm), T_k, B_k, weight in zip(beliefs.components, params.T, params.B, weights):
-            T_arr = self._resolve(T_k, policy)
-            B_arr = self._resolve(B_k, policy)
-            belief_pred = belief @ T_arr[:, action, :]
-            total += weight * float(belief_pred @ B_arr[:, obs_idx])
-        return total
+        rf = np.zeros(self.num_obs)
+        rf[outcome.observation] = 1.0
+        return self.compute_expected_reward(belief_state, rf, params, action, policy)
 
     def compute_expected_reward(self, belief_state: SupraPOMDPWorldModelBeliefState,
                                 reward_function: np.ndarray,
