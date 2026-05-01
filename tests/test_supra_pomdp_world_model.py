@@ -183,9 +183,9 @@ def test_mix_params_preserves_components():
     p1 = _make_2state_params(wm, [1., 0.])
     p2 = _make_2state_params(wm, [0., 1.])
     mixed = wm.mix_params([p1, p2], np.array([0.6, 0.4]))
-    assert len(mixed) == 2
-    assert np.isclose(mixed[0][1], 0.6)
-    assert np.isclose(mixed[1][1], 0.4)
+    assert len(mixed.weights) == 2
+    assert np.isclose(mixed.weights[0], 0.6)
+    assert np.isclose(mixed.weights[1], 0.4)
 
 
 def test_mix_params_weights_sum_to_one():
@@ -193,8 +193,7 @@ def test_mix_params_weights_sum_to_one():
     p1 = _make_2state_params(wm, [1., 0.])
     p2 = _make_2state_params(wm, [0., 1.])
     mixed = wm.mix_params([p1, p2], np.array([0.6, 0.4]))
-    total = sum(w for _, w in mixed)
-    assert np.isclose(total, 1.0)
+    assert np.isclose(mixed.weights.sum(), 1.0)
 
 
 def test_mix_params_flattens_nested_mixtures():
@@ -207,9 +206,8 @@ def test_mix_params_flattens_nested_mixtures():
     m12 = wm.mix_params([p1, p2], np.array([0.5, 0.5]))
     # outer mix: m12 (0.7) + p3 (0.3) → 3 components with weights [0.35, 0.35, 0.30]
     mixed = wm.mix_params([m12, p3], np.array([0.7, 0.3]))
-    assert len(mixed) == 3
-    weights = sorted(w for _, w in mixed)
-    np.testing.assert_allclose(sorted(weights), [0.30, 0.35, 0.35], atol=1e-9)
+    assert len(mixed.weights) == 3
+    np.testing.assert_allclose(sorted(mixed.weights), [0.30, 0.35, 0.35], atol=1e-9)
 
 
 def test_posterior_weights_at_initial_state_equal_prior():
@@ -225,7 +223,7 @@ def test_posterior_weights_at_initial_state_equal_prior():
     # After one obs the weights are not equal to prior; test BEFORE first obs
     # by constructing the initial beliefs manually
     initial_beliefs = SupraPOMDPWorldModelBeliefState(
-        [(wm._initial_belief(cp, None), 0.0) for (cp, _w) in mixed_params]
+        [(wm._initial_belief(th0_k, None), 0.0) for th0_k in mixed_params.theta_0]
     )
     weights = wm._posterior_weights(initial_beliefs, mixed_params)
     np.testing.assert_allclose(weights, [0.6, 0.4], atol=1e-9)
@@ -355,8 +353,8 @@ def test_value_iteration_converges_within_max_iter():
 def test_value_iteration_cache_hit():
     """Same (policy, params id) returns cached V without recomputing."""
     wm, params = _identity_pomdp()
-    T_arr = params.T
-    R = params.R
+    T_arr = params.T[0]
+    R = params.R[0]
     policy = np.array([1.0])
     cache_key = (id(params), policy.tobytes())
     V1 = wm._value_iteration(T_arr, R, policy, cache_key=cache_key)
@@ -544,7 +542,7 @@ def test_initial_belief_uses_callable_theta_0_with_policy():
     params = wm.make_params(T, B, theta_0_fn, R)
 
     policy = np.array([0.8, 0.2])
-    belief = wm._initial_belief(params, policy=policy)
+    belief = wm._initial_belief(params.theta_0[0], policy=policy)
     np.testing.assert_allclose(belief, [0.8, 0.2])
 
 

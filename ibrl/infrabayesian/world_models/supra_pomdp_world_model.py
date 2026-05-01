@@ -1,8 +1,8 @@
-"""SupraPOMDPWorldModel — world model for a finite credal mixture of point-valued POMDPs."""
+"""SupraPOMDPWorldModel — world model for a finite mixture of point-valued POMDPs."""
 from __future__ import annotations
 
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .base import WorldModel
 from ...outcome import Outcome
@@ -13,16 +13,18 @@ from ...outcome import Outcome
 @dataclass
 class SupraPOMDPWorldModelParameters:
     """
-    Parameters of a single POMDP hypothesis.
-        T:       shape (|S|, |A|, |S|) or callable policy → that shape
-        B:       shape (|S|, |O|)      or callable policy → that shape
-        theta_0: shape (|S|,)          or callable policy → that shape
-        R:       shape (|S|, |A|, |S|) — always static
+    Parameters of Supra POMDP world model: lists of POMDP kernels with prior weights.
+        T[k]:       transition for k-th component — shape (|S|,|A|,|S|) or callable policy → that shape
+        B[k]:       observation for k-th component — shape (|S|,|O|)      or callable policy → that shape
+        theta_0[k]: initial belief for k-th component — shape (|S|,)      or callable policy → that shape
+        R[k]:       reward for k-th component — shape (|S|,|A|,|S|), always static
+        weights:    prior weights, shape (num_components,)
     """
-    T: np.ndarray | callable
-    B: np.ndarray | callable
-    theta_0: np.ndarray | callable
-    R: np.ndarray
+    T:       list
+    B:       list
+    theta_0: list
+    R:       list
+    weights: np.ndarray
 
 @dataclass
 class SupraPOMDPWorldModelBeliefState:
@@ -40,15 +42,8 @@ class SupraPOMDPWorldModel(WorldModel):
     Belief state: SupraPOMDPWorldModelBeliefState containing list of (belief_vec, log_marginal)
         per hypothesis component, or None before the first update.
 
-    Hypothesis params — single hypothesis: SupraPOMDPWorldModelParameters with fields:
-        T:       shape (|S|, |A|, |S|) or callable policy → that shape
-        B:       shape (|S|, |O|)      or callable policy → that shape
-        theta_0: shape (|S|,)          or callable policy → that shape
-        R:       shape (|S|, |A|, |S|) — always static
-
-    Mixed params (after Infradistribution.mix): list of (SupraPOMDPWorldModelParameters, prior_weight).
-
-    Construct params via make_params(T, B, theta_0, R).
+    Hypothesis params: SupraPOMDPWorldModelParameters with fields T, B, theta_0, R, weights —
+        each a list over components. Single hypothesis via make_params(T, B, theta_0, R).
 
     Known approximation: compute_q_values uses state-MDP value iteration
     projected via V(b) = b @ V_s, which is exact for fully-observable POMDPs
@@ -67,7 +62,7 @@ class SupraPOMDPWorldModel(WorldModel):
         self.discount = discount
         self.value_iter_tol = value_iter_tol
         self.value_iter_max = value_iter_max
-        # Cache: (id(component_params), policy_bytes) → V vector.
+        # Cache: (id(T_k), id(R_k), policy_bytes) → V vector.
         self._v_cache: dict = {}
 
     @staticmethod
@@ -101,21 +96,21 @@ class SupraPOMDPWorldModel(WorldModel):
         assert np.allclose(B_arr.sum(axis=1), 1),  "B rows must sum to 1"
         assert np.isclose(th0_arr.sum(), 1),        "theta_0 must sum to 1"
 
-        return SupraPOMDPWorldModelParameters(T, B, theta_0, R)
+        return SupraPOMDPWorldModelParameters([T], [B], [theta_0], [R], np.array([1.0]))
 
-    def mix_params(self, params_list: list, coefficients: np.ndarray) -> list:
-        """Mix point-valued POMDP hypotheses into a credal mixture.
-
-        Returns list of (SupraPOMDPWorldModelParameters, prior_weight) tuples. Flattens nested mixtures.
-        """
-        components = []
+    def mix_params(self, params_list: list[SupraPOMDPWorldModelParameters],
+                   coefficients: np.ndarray) -> SupraPOMDPWorldModelParameters:
+        """Mix POMDP hypotheses. Flattens nested mixtures."""
+        T, B, theta_0, R, weights = [], [], [], [], []
         for p, c in zip(params_list, coefficients):
-            if isinstance(p, list):          # already a mixture — flatten
-                components.extend((cp, w * float(c)) for cp, w in p)
-            else:
-                components.append((p, float(c)))
-        total = sum(w for _, w in components)
-        return [(cp, w / total) for cp, w in components]
+            T.extend(p.T)
+            B.extend(p.B)
+            theta_0.extend(p.theta_0)
+            R.extend(p.R)
+            weights.extend(w * float(c) for w in p.weights)
+        weights = np.array(weights)
+        weights /= weights.sum()
+        return SupraPOMDPWorldModelParameters(T, B, theta_0, R, weights)
 
     def event_index(self, outcome: Outcome, action: int) -> int:
         return outcome.observation
@@ -128,31 +123,30 @@ class SupraPOMDPWorldModel(WorldModel):
     def is_initial(self, state: SupraPOMDPWorldModelBeliefState) -> bool:
         return state.components is None
 
-    def _initial_belief(self, component_params: SupraPOMDPWorldModelParameters, policy=None) -> np.ndarray:
+    def _initial_belief(self, theta_0, policy=None) -> np.ndarray:
         """Initial belief for one component, resolving θ₀ against policy."""
-        return self._resolve(component_params.theta_0, policy).copy()
+        return self._resolve(theta_0, policy).copy()
 
     # ── Bayesian filter ───────────────────────────────────────────────────────
 
     def update_state(self, state: SupraPOMDPWorldModelBeliefState, outcome: Outcome, action: int,
-                     policy: np.ndarray, params=None) -> SupraPOMDPWorldModelBeliefState:
+                     policy: np.ndarray, params: SupraPOMDPWorldModelParameters = None) -> SupraPOMDPWorldModelBeliefState:
         """Standard POMDP Bayesian filter applied per component.
 
         State: SupraPOMDPWorldModelBeliefState containing list of (belief_vec, log_marginal) per component.
         Lazily initialises from θ₀ when state.components is None.
         """
-        components = params if isinstance(params, list) else [(params, 1.0)]
         if state.components is None:
-            state_components = [(self._initial_belief(cp, policy), 0.0)
-                               for cp, _w in components]
+            state_components = [(self._initial_belief(th0_k, policy), 0.0)
+                                for th0_k in params.theta_0]
         else:
             state_components = state.components
 
         obs_idx = outcome.observation
         new_state = []
-        for (belief, log_m), (component_params, _w) in zip(state_components, components):
-            T_arr = self._resolve(component_params.T, policy)
-            B_arr = self._resolve(component_params.B, policy)
+        for (belief, log_m), T_k, B_k in zip(state_components, params.T, params.B):
+            T_arr = self._resolve(T_k, policy)
+            B_arr = self._resolve(B_k, policy)
 
             belief_pred = belief @ T_arr[:, action, :]   # shape (|S|,)
             belief_post = B_arr[:, obs_idx] * belief_pred
@@ -165,55 +159,58 @@ class SupraPOMDPWorldModel(WorldModel):
 
         return SupraPOMDPWorldModelBeliefState(new_state)
 
-    def _posterior_weights(self, state: SupraPOMDPWorldModelBeliefState, params) -> np.ndarray:
+    def _posterior_weights(self, state: SupraPOMDPWorldModelBeliefState,
+                           params: SupraPOMDPWorldModelParameters) -> np.ndarray:
         """Posterior weights: weights[k] ∝ prior_weight[k] · P(history|k)."""
-        log_marginals  = np.array([lm for _b, lm in state.components])
-        prior_log_w    = np.log([w  for _,  w in params])
-        log_w = prior_log_w + log_marginals
+        log_marginals = np.array([lm for _b, lm in state.components])
+        log_w = np.log(params.weights) + log_marginals
         log_w -= log_w.max()
         w = np.exp(log_w)
         return w / w.sum()
 
     # ── IB likelihood (one-step, used by Infradistribution.update) ───────────
 
-    def compute_likelihood(self, belief_state: SupraPOMDPWorldModelBeliefState, outcome: Outcome, params,
+    def compute_likelihood(self, belief_state: SupraPOMDPWorldModelBeliefState, outcome: Outcome,
+                           params: SupraPOMDPWorldModelParameters,
                            action: int, policy=None) -> float:
         """P(observation | belief, action) averaged over components by posterior weights."""
-        components = params if isinstance(params, list) else [(params, 1.0)]
         if belief_state.components is None:
-            belief_components = [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
+            belief_components = [(self._initial_belief(th0_k, policy), 0.0)
+                                 for th0_k in params.theta_0]
             beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
         else:
             beliefs = belief_state
-        weights  = self._posterior_weights(beliefs, components)
-        obs_idx  = outcome.observation
-        total    = 0.0
-        for (belief, _lm), (component_params, _w), weight in zip(beliefs.components, components, weights):
-            T_arr = self._resolve(component_params.T, policy)
-            B_arr = self._resolve(component_params.B, policy)
+        weights = self._posterior_weights(beliefs, params)
+        obs_idx = outcome.observation
+        total   = 0.0
+        for (belief, _lm), T_k, B_k, weight in zip(beliefs.components, params.T, params.B, weights):
+            T_arr = self._resolve(T_k, policy)
+            B_arr = self._resolve(B_k, policy)
             belief_pred = belief @ T_arr[:, action, :]
             total += weight * float(belief_pred @ B_arr[:, obs_idx])
         return total
 
-    def compute_expected_reward(self, belief_state: SupraPOMDPWorldModelBeliefState, reward_function: np.ndarray,
-                                params, action: int, policy=None) -> float:
+    def compute_expected_reward(self, belief_state: SupraPOMDPWorldModelBeliefState,
+                                reward_function: np.ndarray,
+                                params: SupraPOMDPWorldModelParameters,
+                                action: int, policy=None) -> float:
         """E[reward_function[next_obs] | belief, action] — one-step expectation.
 
         Used by Infradistribution.update for IB normalisation (the gluing
         operator). Does NOT run value iteration. See compute_q_values for
         multi-step planning.
         """
-        components = params if isinstance(params, list) else [(params, 1.0)]
         if belief_state.components is None:
-            belief_components = [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
+            belief_components = [(self._initial_belief(th0_k, policy), 0.0)
+                                 for th0_k in params.theta_0]
             beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
         else:
             beliefs = belief_state
-        weights = self._posterior_weights(beliefs, components)
+        weights = self._posterior_weights(beliefs, params)
         total   = 0.0
-        for (belief, _lm), (component_params, _w), weight in zip(beliefs.components, components, weights):
-            T_arr = self._resolve(component_params.T, policy)
-            B_arr = self._resolve(component_params.B, policy)
+        for (belief, _lm), T_k, B_k, weight in zip(beliefs.components, params.T, params.B, weights):
+            T_arr = self._resolve(T_k, policy)
+            B_arr = self._resolve(B_k, policy)
             # E[rf[next_obs]] = b @ T[:,a,:] @ B @ rf
             belief_pred = belief @ T_arr[:, action, :]          # (|S|,)
             total += weight * float(belief_pred @ (B_arr @ reward_function))
@@ -221,7 +218,8 @@ class SupraPOMDPWorldModel(WorldModel):
 
     # ── Planning (multi-step, used by SupraPOMDPAgent._expected_rewards) ─────
 
-    def compute_q_values(self, belief_state: SupraPOMDPWorldModelBeliefState, params,
+    def compute_q_values(self, belief_state: SupraPOMDPWorldModelBeliefState,
+                         params: SupraPOMDPWorldModelParameters,
                          policy: np.ndarray | None = None) -> np.ndarray:
         """Multi-step Q-values Q(b, a) for each action under policy π.
 
@@ -231,32 +229,27 @@ class SupraPOMDPWorldModel(WorldModel):
 
         Returns np.ndarray of shape (num_actions,).
         """
-        components = params if isinstance(params, list) else [(params, 1.0)]
         if belief_state.components is None:
-            belief_components = [(self._initial_belief(cp, policy), 0.0) for cp, _w in components]
+            belief_components = [(self._initial_belief(th0_k, policy), 0.0)
+                                 for th0_k in params.theta_0]
             beliefs = SupraPOMDPWorldModelBeliefState(belief_components)
         else:
             beliefs = belief_state
-        weights     = self._posterior_weights(beliefs, components)
-        policy_key  = None if policy is None else policy.tobytes()
-        Q_total     = np.zeros(self.num_actions)
+        weights    = self._posterior_weights(beliefs, params)
+        policy_key = None if policy is None else policy.tobytes()
+        Q_total    = np.zeros(self.num_actions)
 
-        for (belief, _lm), (component_params, _w), credal_weight in zip(beliefs.components, components, weights):
-            T_arr = self._resolve(component_params.T, policy)
-            R = component_params.R
+        for (belief, _lm), T_k, R_k, weight in zip(beliefs.components, params.T, params.R, weights):
+            T_arr = self._resolve(T_k, policy)
 
-            cache_key = (
-                None if policy_key is None else (id(component_params), policy_key)
-            )
-            V_s = self._value_iteration(T_arr, R, policy, cache_key=cache_key)
+            cache_key = None if policy_key is None else (id(T_k), id(R_k), policy_key)
+            V_s = self._value_iteration(T_arr, R_k, policy, cache_key=cache_key)
 
             for a in range(self.num_actions):
                 # Q(b,a) = Σ_s b[s] · Σ_{s'} T[s,a,s'] · (R[s,a,s'] + γ·V[s'])
-                R_sa = (T_arr[:, a, :] * R[:, a, :]).sum(axis=1)  # (|S|,)
-                EV   = T_arr[:, a, :] @ V_s                        # (|S|,)
-                Q_total[a] += credal_weight * float(
-                    belief @ (R_sa + self.discount * EV)
-                )
+                R_sa = (T_arr[:, a, :] * R_k[:, a, :]).sum(axis=1)  # (|S|,)
+                EV   = T_arr[:, a, :] @ V_s                          # (|S|,)
+                Q_total[a] += weight * float(belief @ (R_sa + self.discount * EV))
 
         return Q_total
 
