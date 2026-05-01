@@ -175,6 +175,7 @@ class SupraPOMDPWorldModel(WorldModel):
                            params: SupraPOMDPWorldModelParameters,
                            action: int, policy) -> float:
         """P(observation | belief, action) averaged over components by posterior weights."""
+        # equivalent to compute_expected_reward with an indicator reward vector
         rf = np.zeros(self.num_obs)
         rf[outcome.observation] = 1.0
         return self.compute_expected_reward(belief_state, rf, params, action, policy)
