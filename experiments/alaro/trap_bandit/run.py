@@ -38,6 +38,17 @@ class TrapBanditConfig:
     seed: int = 123
     alpha_dgp: tuple[float, float] = (2.0, 2.0)
     p_beta: tuple[float, float] = (2.0, 2.0)
+    common_action_draws: bool = True
+
+
+def sample_action_from_uniform(probabilities: np.ndarray, draw: float) -> int:
+    """Sample from a policy using an externally supplied uniform draw."""
+    probabilities = np.asarray(probabilities, dtype=float)
+    probabilities = probabilities / probabilities.sum()
+    draw = min(max(float(draw), 0.0), np.nextafter(1.0, 0.0))
+    cumulative = np.cumsum(probabilities)
+    cumulative[-1] = 1.0
+    return int(np.searchsorted(cumulative, draw, side="right"))
 
 
 def make_agent(
@@ -94,6 +105,7 @@ def run_agent_on_world(
     config: TrapBanditConfig,
     *,
     seed: int,
+    action_draws: np.ndarray | None = None,
 ) -> dict:
     env = TrapBanditEnvironment(
         p1=world["p1"],
@@ -115,7 +127,11 @@ def run_agent_on_world(
     optimal = env.get_optimal_reward()
     for step in range(config.num_steps):
         probs = agent.get_probabilities()
-        action = int(agent.random.choice(agent.num_actions, p=probs))
+        if action_draws is None:
+            action_draw = agent.random.random()
+        else:
+            action_draw = action_draws[step]
+        action = sample_action_from_uniform(probs, action_draw)
         outcome = env.step(probs, action)
         agent.update(probs, action, outcome)
 
@@ -186,10 +202,21 @@ def run_condition(
 
     for world_idx in range(config.num_worlds):
         world = sample_world(rng, config)
+        action_draws = None
+        if config.common_action_draws:
+            action_draws = np.random.default_rng(
+                config.seed + 1_000_000 + world_idx
+            ).random(config.num_steps)
         for kind in kinds:
             agent = make_agent(kind, alpha_prior, config, safe=safe, risky=risky)
             results[kind].append(
-                run_agent_on_world(agent, world, config, seed=config.seed + world_idx)
+                run_agent_on_world(
+                    agent,
+                    world,
+                    config,
+                    seed=config.seed + world_idx,
+                    action_draws=action_draws,
+                )
             )
     return results
 
@@ -239,6 +266,7 @@ def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
         "seed": config.seed,
         "alpha_dgp": list(config.alpha_dgp),
         "p_beta": list(config.p_beta),
+        "common_action_draws": config.common_action_draws,
         "kinds": kinds,
         "conditions": {
             "correct": {"prior": [2.0, 2.0], "dgp": [2.0, 2.0]},
@@ -371,6 +399,11 @@ def parse_args():
     parser.add_argument("--output-dir", type=Path, default=Path("experiments/alaro/trap_bandit/results"))
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
+        "--independent-action-draws",
+        action="store_true",
+        help="Use each agent's own RNG for action sampling instead of common random numbers.",
+    )
+    parser.add_argument(
         "--kinds",
         nargs="*",
         default=["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"],
@@ -385,6 +418,7 @@ if __name__ == "__main__":
         num_steps=args.num_steps,
         num_grid=args.num_grid,
         seed=args.seed,
+        common_action_draws=not args.independent_action_draws,
     )
     summaries = run_and_save(
         config=cfg,
