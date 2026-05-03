@@ -1,9 +1,6 @@
-"""Compatibility imports for exploration strategies.
+"""Exploration and action-selection strategies."""
 
-Prefer importing from `ibrl.exploration`.
-"""
-
-from ibrl.exploration import (
+from .strategies import (
     EpsilonGreedy,
     ExplorationStrategy,
     Greedy,

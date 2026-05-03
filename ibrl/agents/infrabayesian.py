@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 
 from . import BaseGreedyAgent
-from .exploration import ExplorationStrategy
+from ..exploration import ExplorationStrategy
 from ..infrabayesian.a_measure import AMeasure
 from ..infrabayesian.infradistribution import Infradistribution
 

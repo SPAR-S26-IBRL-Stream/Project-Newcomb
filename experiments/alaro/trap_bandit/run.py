@@ -10,8 +10,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ibrl.agents import Greedy, InfraBayesianAgent, ThompsonSampling, UCB
+from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.trap_bandit import TrapBanditEnvironment
+from ibrl.exploration import Greedy, HypothesisThompsonSampling, UCB
 from ibrl.infrabayesian.builders.trap_bandit import (
     OUTCOME_CATASTROPHE,
     make_bayesian_hypothesis,
@@ -61,7 +62,7 @@ def make_agent(
         if kind == "bayes_greedy":
             strategy = Greedy()
         elif kind == "bayes_thompson":
-            strategy = ThompsonSampling()
+            strategy = HypothesisThompsonSampling()
         elif kind == "bayes_ucb":
             strategy = UCB(c=2.0)
         else:

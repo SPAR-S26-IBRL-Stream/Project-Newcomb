@@ -1,7 +1,8 @@
 import numpy as np
 
-from ibrl.agents import Greedy, InfraBayesianAgent, ThompsonSampling, UCB
+from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.trap_bandit import TrapBanditEnvironment
+from ibrl.exploration import Greedy, HypothesisThompsonSampling, UCB
 from ibrl.infrabayesian.builders.trap_bandit import (
     make_bayesian_hypothesis,
     make_ib_hypothesis,
@@ -77,7 +78,7 @@ def test_thompson_sampling_returns_valid_policy():
         hypotheses=[bayes_h],
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
-        exploration_strategy=ThompsonSampling(),
+        exploration_strategy=HypothesisThompsonSampling(),
         epsilon=0.0,
     )
     agent.reset()
