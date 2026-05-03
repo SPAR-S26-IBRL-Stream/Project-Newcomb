@@ -10,6 +10,14 @@ from .experimental2 import ExperimentalAgent2
 from .experimental3 import ExperimentalAgent3
 from .infrabayesian import InfraBayesianAgent
 from .thompson_bernoulli import ThompsonSamplingBernoulli
+from .exploration import (
+    EpsilonGreedy,
+    ExplorationStrategy,
+    Greedy,
+    ThompsonSampling,
+    UCB,
+    UniformPrefixThen,
+)
 
 __all__ = [
     "BaseAgent",
@@ -24,4 +32,10 @@ __all__ = [
     "ExperimentalAgent3",
     "InfraBayesianAgent",
     "ThompsonSamplingBernoulli",
+    "EpsilonGreedy",
+    "ExplorationStrategy",
+    "Greedy",
+    "ThompsonSampling",
+    "UCB",
+    "UniformPrefixThen",
 ]
