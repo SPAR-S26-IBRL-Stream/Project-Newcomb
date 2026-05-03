@@ -8,7 +8,7 @@ Note that experiment 2 can be thought of as newcomb-like and closely resembles t
 In each experiment, we compare three agents:
 1. A classic bayesian thompson sampling learner starting with uninformative beta priors on each arm.
 2. An exp3 learner with $\eta = \sqrt(\log(k)/(nk))$ (chosen to optimize the regret bound)
-3. An infra-bayesian learner with knightian uncertainty on each arm: the bias could be anywhere between $[0.5, 0.99]$ with uncertain probability.
+3. An infra-bayesian learner with [insert appropriate hypothesis characteristics here]
 
 Our hypothesis is that the infra-bayesian agent will perform better than the classic learner in experiments (2) and (3) but worse in (1) (ideally, not too much worse). We hope it will do better than Exp3 in all experiments.
 
