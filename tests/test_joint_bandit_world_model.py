@@ -126,3 +126,38 @@ def test_bayesian_mix_averages_and_ku_takes_min():
 
     assert np.isclose(bayes_value, (0.7 + (0.7 - 10.0)) / 2)
     assert np.isclose(ku_value, 0.7 - 10.0)
+
+
+def test_ku_update_removes_measure_that_makes_event_impossible():
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
+    safe = Infradistribution([
+        AMeasure(wm.make_params([
+            JointBanditComponent(
+                trap_bandit_probs(np.array([0.7, 0.3]), world_type="safe", p_cat=0.01)
+            )
+        ]))
+    ], world_model=wm)
+    risky = Infradistribution([
+        AMeasure(wm.make_params([
+            JointBanditComponent(
+                trap_bandit_probs(np.array([0.7, 0.3]), world_type="risky", p_cat=0.01)
+            )
+        ]))
+    ], world_model=wm)
+    ku = Infradistribution.mixKU([safe, risky])
+
+    ku.update(
+        REWARD_FUNCTION,
+        Outcome(reward=-1000.0, observation=OUTCOME_CATASTROPHE),
+        action=0,
+        policy=np.array([0.5, 0.5]),
+    )
+
+    assert len(ku.measures) == 1
+    assert ku.world_model.compute_likelihood(
+        ku.belief_state,
+        Outcome(reward=-1000.0, observation=OUTCOME_CATASTROPHE),
+        ku.measures[0].params,
+        action=0,
+        policy=np.array([0.5, 0.5]),
+    ) > 0

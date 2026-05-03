@@ -81,6 +81,20 @@ class Infradistribution:
         Update all a-measures upon seeing a certain event using a given reward function
         This is Definition 11 from Basic Inframeasure Theory
         """
+        likelihoods = np.array([
+            self.world_model.compute_likelihood(
+                self.belief_state, outcome, measure.params, action, policy)
+            for measure in self.measures
+        ])
+        possible = likelihoods > 0
+        assert possible.any(), "Observed an event that all a-measures assigned zero probability"
+        if not possible.all():
+            self.measures = [
+                measure for measure, keep in zip(self.measures, possible)
+                if keep
+            ]
+            likelihoods = likelihoods[possible]
+
         event = self.world_model.event_index(outcome, action)
         rf = reward_function[action]
 
@@ -90,7 +104,7 @@ class Infradistribution:
         expect0 = self.evaluate_action(glued0, action, policy)
         expect1 = self.evaluate_action(glued1, action, policy)
         probability = expect1 - expect0
-        assert probability > 0  # If probability==0, the measure should be removed (to it, nothing matters anymore)
+        assert probability > 0
         expect_m = [measure.evaluate_action(self.world_model, self.belief_state, glued0,
                                             action, policy)
                     for measure in self.measures]
@@ -98,9 +112,8 @@ class Infradistribution:
         # Raw update 1: Update belief state
         # Update normalisation to the amount that we cut off
         # This is the m*L term of the IB update rule
-        for measure in self.measures:
-            measure.scale *= self.world_model.compute_likelihood(
-                self.belief_state, outcome, measure.params, action, policy)
+        for measure, likelihood in zip(self.measures, likelihoods):
+            measure.scale *= likelihood
         self.belief_state = self.world_model.update_state(
             self.belief_state, outcome, action, policy,
             params=self.measures[0].params)
