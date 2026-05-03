@@ -2,33 +2,33 @@
 
 Below we describe a simple experiment to demonstrate how a robust infra-Bayesian learner may be beneficial even in a stateless, stochastic bandit setting.
 
-There are always `K=2` possible arms to pull. The goal of the agent is to learn which arm generates the higher expected reward and exploit that arm. There is a probability `alpha` of being in a risky world, and probability `1 - alpha` of being in a safe world.
+The details of our experiment are as follows. There are `K=2` possible arms to pull. There is a probability `alpha` of being in a risky world, and probability `1 - alpha` of being in a safe world.
 
-In the safe world, each arm is Bernoulli and has fixed probability `(p_1, p_2)` of yielding reward `1`. In the risky world, the arm with the higher realized bias `p_i` is a three-sided die with a small probability `p_catastrophe` of yielding reward `-1000`; with probability `p_i`, it yields reward `1`; otherwise it yields reward `0`.
+At the beginning of a new run, p_1 and p_2 are newly sampled from a beta distribution. The world_type = {risky, safe} is also sampled.  In the safe world, each arm is Bernoulli and has fixed probability, `p_i`, of yielding reward `1`. In the risky world, the arm with the higher realized bias `p_i` is a three-sided die with a small probability `p_catastrophe` of yielding reward `-1000`; with probability `p_i`, it yields reward `1`; otherwise it yields reward `0`. The arm with the lower realized bias is still Bernoulli with reward = {1,0}.
 
 ```text
-sample alpha ~ Beta(2,2)
-sample p1, p2 ~ Beta(2,2)
-sample world_type ~ Bernoulli(alpha)
+For each new run:
+    sample alpha ~ Beta(2,2) or Beta(1,99)
+    sample p1, p2 ~ Beta(2,2)
+    sample world_type ~ Bernoulli(alpha)
 
-safe world:
-  arm i -> Bernoulli(p_i)
+    if safe world:
+        arm i -> Bernoulli(p_i)
 
-risky world:
-  trapped_arm = argmax(p1, p2)
-  trapped_arm -> reward -1000 (catastrophe) with probability 0.01
-                 reward 1 with probability p_i
-                 reward 0 otherwise
-  other arm   -> Bernoulli(p_i)
+    if risky world:
+        trapped_arm = argmax(p1, p2)
+        trapped_arm -> reward -1000 (catastrophe) with probability 0.01
+                        reward 1 with probability p_i
+                        reward 0 otherwise
+        other arm   -> Bernoulli(p_i)
 ```
+Schema 1. Experiment world design.
 
-Figure 1. Hierarchical world design of possible outcomes in the experiment.
+We compare classical Bayesian agents and an infra-Bayesian agent using the same joint hypothesis machinery. Bayesian agents always use `Infradistribution.mix(...)`; the infra-Bayesian agent uses Knightian uncertainty over the safe-vs-risky world families via `Infradistribution.mixKU(...)`, while remaining classical/Bayesian (employing `Infradistribution.mix(...)`) over `p1,p2` within each family.
 
-We compare classical Bayesian agents and an infra-Bayesian agent using the same joint hypothesis machinery. Bayesian agents use `Infradistribution.mix(...)`; the infra-Bayesian agent uses Knightian uncertainty over the safe-vs-risky world families via `Infradistribution.mixKU(...)`, while remaining classical/Bayesian over `p1,p2` within each family.
+In the first experiment, all Bayesian priors match the data-generating process: `alpha ~ Beta(2,2)` and `p1,p2 ~ Beta(2,2)`. In the second and third experiments, we run increasingly misspecified-prior conditions where Bayesian agents put lower-than-actual probability on the risky world, using `alpha ~ Beta(2,5)` and `alpha ~ Beta(1,99)`. Finally, in our fourth experiment, we change the data generating process to be mostly safe (`alpha ~ Beta(1,99)`), such that the expected value maximizer would risk pulling the risky arm. We correctly specify the prior in this condition. The infra-Bayesian agent always shares the same classical `p1,p2` prior as the Bayesian agent but maintains Knightian uncertainty over whether the world is safe or risky.
 
-First, priors match the data-generating process: `alpha ~ Beta(2,2)`, `p1,p2 ~ Beta(2,2)`, and `p_catastrophe = 1/100`. Then we run a misspecified-prior condition where Bayesian agents put lower-than-actual probability on the risky world, using `alpha ~ Beta(2,5)`. The infra-Bayesian agent shares the same `p1,p2` prior but maintains Knightian uncertainty over whether the world is safe or risky.
-
-We also include a mostly-safe correctly specified condition. Since `alpha` denotes probability of a risky world, this is implemented as `alpha ~ Beta(1,99)`, equivalent to a `Beta(99,1)` prior over being safe.
+We also include a mostly-safe, correctly specified condition. Since `alpha` denotes probability of a risky world, this is implemented as `alpha ~ Beta(1,99)`, equivalent to a `Beta(99,1)` prior over being safe.
 
 For Bayesian agents, we compare three exploration strategies:
 
@@ -42,10 +42,10 @@ Regret is measured against the best policy with full knowledge of the true world
 
 ## Preliminary Downscaled Results
 
-The current implementation is in `experiments/alaro/trap_bandit/`. For a first artifact run, we used a downscaled configuration because the full `100 worlds x 1000 steps` run is still slow:
+The current implementation is in `experiments/alaro/trap_bandit/` and the following results were generated using the below configs:
 
 ```text
-num_worlds = 20
+num_worlds = 100
 num_steps = 200
 num_grid = 7
 p_cat = 0.01
