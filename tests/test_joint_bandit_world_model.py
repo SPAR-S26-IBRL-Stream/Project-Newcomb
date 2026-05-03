@@ -1,10 +1,12 @@
 import numpy as np
 
 from ibrl.infrabayesian import AMeasure, Infradistribution
-from ibrl.infrabayesian.world_models.joint_bandit_world_model import (
+from ibrl.infrabayesian.builders.trap_bandit import (
     OUTCOME_CATASTROPHE,
     OUTCOME_ONE,
-    OUTCOME_ZERO,
+    trap_bandit_probs,
+)
+from ibrl.infrabayesian.world_models.joint_bandit_world_model import (
     JointBanditComponent,
     JointBanditWorldModel,
 )
@@ -18,8 +20,10 @@ REWARD_FUNCTION = np.array([
 
 
 def test_safe_component_arm_probabilities():
-    wm = JointBanditWorldModel()
-    component = JointBanditComponent("safe", p1=0.7, p2=0.3, p_cat=0.01)
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
+    component = JointBanditComponent(
+        trap_bandit_probs(np.array([0.7, 0.3]), world_type="safe", p_cat=0.01)
+    )
 
     np.testing.assert_allclose(
         wm.component_outcome_probs(component, 0),
@@ -32,10 +36,13 @@ def test_safe_component_arm_probabilities():
 
 
 def test_risky_component_traps_higher_bias_arm():
-    wm = JointBanditWorldModel()
-    component = JointBanditComponent("risky", p1=0.7, p2=0.3, p_cat=0.01)
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
+    component = JointBanditComponent(
+        trap_bandit_probs(np.array([0.7, 0.3]), world_type="risky", p_cat=0.01),
+        metadata={"trapped_arm": 0},
+    )
 
-    assert wm.trapped_arm(component) == 0
+    assert component.metadata["trapped_arm"] == 0
     np.testing.assert_allclose(
         wm.component_outcome_probs(component, 0),
         [0.29, 0.7, 0.01],
@@ -47,15 +54,19 @@ def test_risky_component_traps_higher_bias_arm():
 
 
 def test_event_index_uses_observation_not_reward():
-    wm = JointBanditWorldModel()
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
     outcome = Outcome(reward=-1000.0, observation=OUTCOME_CATASTROPHE)
     assert wm.event_index(outcome, action=0) == OUTCOME_CATASTROPHE
 
 
 def test_posterior_weights_shift_after_observation():
-    wm = JointBanditWorldModel()
-    low = JointBanditComponent("safe", p1=0.2, p2=0.2, p_cat=0.01)
-    high = JointBanditComponent("safe", p1=0.8, p2=0.2, p_cat=0.01)
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
+    low = JointBanditComponent(
+        trap_bandit_probs(np.array([0.2, 0.2]), world_type="safe", p_cat=0.01)
+    )
+    high = JointBanditComponent(
+        trap_bandit_probs(np.array([0.8, 0.2]), world_type="safe", p_cat=0.01)
+    )
     params = wm.make_params([low, high], np.array([0.5, 0.5]))
     state = wm.initial_state()
 
@@ -72,9 +83,17 @@ def test_posterior_weights_shift_after_observation():
 
 
 def test_mix_params_preserves_joint_components():
-    wm = JointBanditWorldModel()
-    p0 = wm.make_params([JointBanditComponent("safe", 0.2, 0.8, 0.01)])
-    p1 = wm.make_params([JointBanditComponent("risky", 0.2, 0.8, 0.01)])
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
+    p0 = wm.make_params([
+        JointBanditComponent(
+            trap_bandit_probs(np.array([0.2, 0.8]), world_type="safe", p_cat=0.01)
+        )
+    ])
+    p1 = wm.make_params([
+        JointBanditComponent(
+            trap_bandit_probs(np.array([0.2, 0.8]), world_type="risky", p_cat=0.01)
+        )
+    ])
 
     mixed = wm.mix_params([p0, p1], np.array([0.75, 0.25]))
 
@@ -83,12 +102,20 @@ def test_mix_params_preserves_joint_components():
 
 
 def test_bayesian_mix_averages_and_ku_takes_min():
-    wm = JointBanditWorldModel()
+    wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
     safe = Infradistribution([
-        AMeasure(wm.make_params([JointBanditComponent("safe", 0.7, 0.3, 0.01)]))
+        AMeasure(wm.make_params([
+            JointBanditComponent(
+                trap_bandit_probs(np.array([0.7, 0.3]), world_type="safe", p_cat=0.01)
+            )
+        ]))
     ], world_model=wm)
     risky = Infradistribution([
-        AMeasure(wm.make_params([JointBanditComponent("risky", 0.7, 0.3, 0.01)]))
+        AMeasure(wm.make_params([
+            JointBanditComponent(
+                trap_bandit_probs(np.array([0.7, 0.3]), world_type="risky", p_cat=0.01)
+            )
+        ]))
     ], world_model=wm)
 
     bayes = Infradistribution.mix([safe, risky], np.array([0.5, 0.5]))

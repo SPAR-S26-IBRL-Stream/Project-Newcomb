@@ -1,6 +1,9 @@
-"""Compatibility imports for promoted trap-bandit builders."""
+"""Reusable hypothesis builders for infrabayesian world models."""
 
-from ibrl.infrabayesian.builders.trap_bandit import (
+from .trap_bandit import (
+    OUTCOME_CATASTROPHE,
+    OUTCOME_ONE,
+    OUTCOME_ZERO,
     beta_grid_weights,
     make_bayesian_hypothesis,
     make_ib_hypothesis,
@@ -11,6 +14,9 @@ from ibrl.infrabayesian.builders.trap_bandit import (
 )
 
 __all__ = [
+    "OUTCOME_CATASTROPHE",
+    "OUTCOME_ONE",
+    "OUTCOME_ZERO",
     "beta_grid_weights",
     "make_bayesian_hypothesis",
     "make_ib_hypothesis",

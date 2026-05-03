@@ -1,4 +1,4 @@
-"""JointBanditWorldModel — joint hypotheses for two-arm trap bandits."""
+"""JointBanditWorldModel — joint hypotheses for finite-outcome bandits."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,46 +9,41 @@ from .base import WorldModel
 from ...outcome import Outcome
 
 
-OUTCOME_ZERO = 0
-OUTCOME_ONE = 1
-OUTCOME_CATASTROPHE = 2
-
-
 @dataclass(frozen=True)
 class JointBanditComponent:
-    """One complete bandit world."""
-    world_type: str  # "safe" or "risky"
-    p1: float
-    p2: float
-    p_cat: float = 0.01
+    """One complete finite-outcome bandit hypothesis.
+
+    probs[action, outcome] is the probability of outcome after pulling action.
+    metadata is optional experiment-specific information, ignored by the model.
+    """
+    probs: np.ndarray
+    metadata: dict | None = None
 
 
 @dataclass
 class JointBanditWorldModelParameters:
-    """Mixture over complete joint bandit worlds."""
+    """Mixture over complete joint bandit hypotheses."""
     components: list[JointBanditComponent]
     weights: np.ndarray
 
 
 @dataclass
 class JointBanditBeliefState:
-    """Outcome counts by arm.
-
-    history[action, outcome], where outcomes are zero, one, catastrophe.
-    """
+    """Outcome counts by action: history[action, outcome]."""
     history: np.ndarray
 
 
 class JointBanditWorldModel(WorldModel):
-    """World model for two-arm trap bandits with joint arm hypotheses.
+    """World model for finite-outcome bandits with joint arm hypotheses.
 
-    Unlike MultiBernoulliWorldModel, this keeps p1 and p2 in the same
-    component so a risky world's trapped arm can depend on argmax(p1, p2).
+    MultiBernoulliWorldModel factorizes uncertainty per arm. This model keeps
+    each complete bandit as one component, so hypotheses can encode correlations
+    or constraints across arms.
     """
 
-    def __init__(self, num_arms: int = 2, num_outcomes: int = 3):
-        assert num_arms == 2, "trap-bandit experiments currently assume exactly two arms"
-        assert num_outcomes == 3
+    def __init__(self, num_arms: int, num_outcomes: int):
+        assert num_arms >= 1
+        assert num_outcomes >= 2
         self.num_arms = num_arms
         self.num_outcomes = num_outcomes
 
@@ -58,8 +53,15 @@ class JointBanditWorldModel(WorldModel):
         weights: np.ndarray | None = None,
     ) -> JointBanditWorldModelParameters:
         assert len(components) > 0
+        normalized_components = []
         for component in components:
             self._validate_component(component)
+            normalized_components.append(
+                JointBanditComponent(
+                    np.asarray(component.probs, dtype=float),
+                    metadata=component.metadata,
+                )
+            )
         if weights is None:
             weights = np.ones(len(components)) / len(components)
         weights = np.asarray(weights, dtype=float)
@@ -67,7 +69,7 @@ class JointBanditWorldModel(WorldModel):
         assert np.all(weights >= 0)
         assert weights.sum() > 0
         weights = weights / weights.sum()
-        return JointBanditWorldModelParameters(list(components), weights)
+        return JointBanditWorldModelParameters(normalized_components, weights)
 
     def mix_params(
         self,
@@ -163,6 +165,8 @@ class JointBanditWorldModel(WorldModel):
         component: JointBanditComponent,
         reward_function: np.ndarray,
     ) -> np.ndarray:
+        if reward_function.ndim == 1:
+            return component.probs @ reward_function
         return np.array([
             self.component_outcome_probs(component, action) @ reward_function[action]
             for action in range(self.num_arms)
@@ -173,21 +177,13 @@ class JointBanditWorldModel(WorldModel):
         component: JointBanditComponent,
         action: int,
     ) -> np.ndarray:
-        p = component.p1 if action == 0 else component.p2
-        if component.world_type == "risky" and action == self.trapped_arm(component):
-            return np.array([1.0 - p - component.p_cat, p, component.p_cat])
-        return np.array([1.0 - p, p, 0.0])
-
-    def trapped_arm(self, component: JointBanditComponent) -> int:
-        return 0 if component.p1 >= component.p2 else 1
+        return component.probs[action]
 
     def to_str(self, params: JointBanditWorldModelParameters) -> str:
         return f"JointBandit({len(params.components)} components)"
 
     def _validate_component(self, component: JointBanditComponent) -> None:
-        assert component.world_type in {"safe", "risky"}
-        assert 0 <= component.p1 <= 1
-        assert 0 <= component.p2 <= 1
-        assert 0 <= component.p_cat <= 1
-        assert component.p1 + component.p_cat <= 1
-        assert component.p2 + component.p_cat <= 1
+        probs = np.asarray(component.probs, dtype=float)
+        assert probs.shape == (self.num_arms, self.num_outcomes)
+        assert np.all(probs >= 0)
+        assert np.allclose(probs.sum(axis=1), 1)

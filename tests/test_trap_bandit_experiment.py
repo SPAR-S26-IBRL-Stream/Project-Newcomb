@@ -1,8 +1,8 @@
 import numpy as np
 
 from ibrl.agents import Greedy, InfraBayesianAgent, ThompsonSampling, UCB
-from experiments.alaro.trap_bandit.environment import TrapBanditEnvironment
-from experiments.alaro.trap_bandit.hypotheses import (
+from ibrl.environments.trap_bandit import TrapBanditEnvironment
+from ibrl.infrabayesian.builders.trap_bandit import (
     make_bayesian_hypothesis,
     make_ib_hypothesis,
     make_trap_bandit_hypotheses,

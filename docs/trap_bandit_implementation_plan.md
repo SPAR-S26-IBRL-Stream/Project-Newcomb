@@ -2,6 +2,12 @@
 
 This plan describes how to implement the experiment in [trap_bandit_experiment.md](./trap_bandit_experiment.md).
 
+Implementation note: the final code promotes a generic `JointBanditWorldModel`
+that stores per-arm finite outcome distributions in each component. Trap-specific
+logic such as `argmax(p1, p2)` and `p_cat` lives in
+`ibrl.infrabayesian.builders.trap_bandit` and
+`ibrl.environments.trap_bandit`, not in the generic world model.
+
 The core idea is to use the same infra-Bayesian machinery for both agents:
 
 - **Bayesian agents** use `Infradistribution.mix(...)`.

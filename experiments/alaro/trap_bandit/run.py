@@ -11,14 +11,14 @@ from pathlib import Path
 import numpy as np
 
 from ibrl.agents import Greedy, InfraBayesianAgent, ThompsonSampling, UCB
-from ibrl.infrabayesian.world_models.joint_bandit_world_model import OUTCOME_CATASTROPHE
-
-from .environment import TrapBanditEnvironment
-from .hypotheses import (
+from ibrl.environments.trap_bandit import TrapBanditEnvironment
+from ibrl.infrabayesian.builders.trap_bandit import (
+    OUTCOME_CATASTROPHE,
     make_bayesian_hypothesis,
     make_ib_hypothesis,
     make_trap_bandit_hypotheses,
 )
+
 from .plot import plot_condition_grid, plot_log_regret, plot_percentile_band
 
 
