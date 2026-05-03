@@ -78,7 +78,7 @@ def test_posterior_weights_shift_after_observation():
             policy=np.array([0.5, 0.5]),
         )
 
-    weights = wm.posterior_component_weights(state, params)
+    weights = wm.get_posterior_component_weights(state, params)
     assert weights[1] > weights[0]
 
 

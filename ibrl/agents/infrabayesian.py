@@ -117,9 +117,9 @@ class InfraBayesianAgent(BaseGreedyAgent):
         measure = self.dist.measures[0]
         world_model = self.dist.world_model
         params = measure.params
-        weights = world_model.posterior_component_weights(self.dist.belief_state, params)
+        weights = world_model.get_posterior_component_weights(self.dist.belief_state, params)
         idx = int(self.random.choice(len(params.components), p=weights))
         return params.components[idx]
 
     def values_for_component(self, component) -> np.ndarray:
-        return self.dist.world_model.component_expected_rewards(component, self.reward_function)
+        return self.dist.world_model.get_component_expected_rewards(component, self.reward_function)

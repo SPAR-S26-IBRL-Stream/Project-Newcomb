@@ -131,7 +131,7 @@ class JointBanditWorldModel(WorldModel):
         probs = self.posterior_predictive(belief_state, params, action)
         return float(probs @ reward_function)
 
-    def posterior_component_weights(
+    def get_posterior_component_weights(
         self,
         belief_state: JointBanditBeliefState,
         params: JointBanditWorldModelParameters,
@@ -154,13 +154,13 @@ class JointBanditWorldModel(WorldModel):
         params: JointBanditWorldModelParameters,
         action: int,
     ) -> np.ndarray:
-        weights = self.posterior_component_weights(belief_state, params)
+        weights = self.get_posterior_component_weights(belief_state, params)
         predictive = np.zeros(self.num_outcomes)
         for weight, component in zip(weights, params.components):
             predictive += weight * self.component_outcome_probs(component, action)
         return predictive / predictive.sum()
 
-    def component_expected_rewards(
+    def get_component_expected_rewards(
         self,
         component: JointBanditComponent,
         reward_function: np.ndarray,
@@ -178,6 +178,10 @@ class JointBanditWorldModel(WorldModel):
         action: int,
     ) -> np.ndarray:
         return component.probs[action]
+
+    # Backwards-compatible aliases for older experiment code/tests.
+    posterior_component_weights = get_posterior_component_weights
+    component_expected_rewards = get_component_expected_rewards
 
     def to_str(self, params: JointBanditWorldModelParameters) -> str:
         return f"JointBandit({len(params.components)} components)"
