@@ -1,38 +1,57 @@
-"""SupraPOMDPAgent — IB agent with multi-step planning via compute_q_values."""
-from __future__ import annotations
-
+from dataclasses import dataclass
 import numpy as np
+from typing import Callable, Tuple
 
-from .infrabayesian import InfraBayesianAgent
 
-
-class SupraPOMDPAgent(InfraBayesianAgent):
-    """InfraBayesianAgent subclass for supra-POMDP world models.
-
-    Overrides _expected_rewards to use world_model.compute_q_values for
-    action selection. The candidate policy from the optimizer's loop is
-    threaded directly into compute_q_values so that policy-dependent
-    kernels (T(π), B(π), θ₀(π)) see the correct committed policy —
-    the mechanism that enforces pseudocausal coupling in Newcomb-family
-    environments.
-
-    IB belief updating (Infradistribution.update) continues to use
-    compute_expected_reward (one-step E[rf[next_obs]]) for normalization.
+@dataclass
+class StatefulPolicy:
     """
+    Belief-indexed policy π: B → Δ(A).
+    
+    For finite obs spaces, discretizes observation history into belief indices.
+    For manageable cases, stores action distributions per belief.
+    
+    Storage: policy_table[belief_idx] = action_distribution (shape |A|)
+    """
+    policy_table: np.ndarray  # shape (num_beliefs, num_actions)
+    belief_indexer: Callable[[np.ndarray], int]  # Maps belief → index in policy_table
+    
+    def __call__(self, belief: np.ndarray) -> np.ndarray:
+        """Get action distribution for given belief."""
+        idx = self.belief_indexer(belief)
+        return self.policy_table[idx].copy()
+    
+    def __getitem__(self, belief_idx: int) -> np.ndarray:
+        """Direct access by belief index."""
+        return self.policy_table[belief_idx]
+    
+    def set_action_dist(self, belief_idx: int, action_dist: np.ndarray):
+        """Set action distribution for a belief."""
+        assert np.isclose(action_dist.sum(), 1.0)
+        self.policy_table[belief_idx] = action_dist
 
-    def _expected_rewards(self) -> np.ndarray:
-        wm = self.dist.world_model
-        params = self.dist.measures[0].params
+    @property
+    def num_actions(self) -> int:
+        return self.policy_table.shape[1]
+    
+    @property
+    def num_beliefs(self) -> int:
+        return self.policy_table.shape[0]
 
-        expected_rewards = np.array([
-            float(np.dot(
-                wm.compute_q_values(self.dist.belief_state, params, policy=policy),
-                policy,
-            ))
-            for policy in self.policies
-        ])
+    def to_flat_policy(self) -> np.ndarray:
+        """Convert to old flat policy (average over beliefs, for backward compat)."""
+        return self.policy_table.mean(axis=0)
 
-        optimal = np.isclose(expected_rewards, expected_rewards.max())
-        return (
-            np.array(self.policies) * np.expand_dims(optimal, axis=1)
-        ).sum(axis=0) / optimal.sum()
+    @classmethod
+    def uniform(cls, num_beliefs: int, num_actions: int, 
+                belief_indexer: Callable) -> "StatefulPolicy":
+        """Create uniform policy over all beliefs and actions."""
+        policy_table = np.ones((num_beliefs, num_actions)) / num_actions
+        return cls(policy_table, belief_indexer)
+        
+
+
+## Code rationale :
+
+# captured belief-indexed action distributions
+# Provides with both direct indexing and callable interface

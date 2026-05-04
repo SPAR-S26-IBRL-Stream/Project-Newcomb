@@ -11,6 +11,7 @@ Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
     git clone https://github.com/Lorxus/Project-Newcomb.git
     cd Project-Newcomb
     uv sync
+    uv sync --all-extra (or)
 
 To add a dependency: `uv add <package-name>`. This updates `pyproject.toml` and `uv.lock`. Commit both.
 
@@ -145,6 +146,16 @@ uv run pytest tests/test_environments.py -v
 uv run pytest tests/test_simulator.py -v
 uv run pytest tests/test_construction.py -v
 
+# Commands post-pomdp addition:
+```
+uv sync --extra test
+uv run pytest tests/test_supra_pomdp_smoke.py -v
+uv run pytest tests/test_supra_pomdp_*.py -v
+uv run python verify_state_dependent.py && uv run pytest tests/test_supra_pomdp_agent.py
+
+uv run pytest --cov=ibrl --cov-report=term-missing
+```
+
 
 # Run and see the coverage report
 
@@ -154,4 +165,13 @@ uv run pytest --cov=ibrl --cov-report=term-missing
 ```
 
 or just push a commit and check github https://github.com/SPAR-S26-IBRL-Stream/Project-Newcomb/actions in a minute
+
+# build bugs:
+
+'''
+uv sync --extra tests -v (shows the issue)
+uv sync cache clean
+uv sync cache clean(if other process running,to override)
+uv sync --extra tests --reinstall 
+``` 
 

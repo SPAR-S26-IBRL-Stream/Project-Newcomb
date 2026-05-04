@@ -32,7 +32,7 @@ class WorldModel(ABC):
         pass
 
     @abstractmethod
-    def event_index(self, outcome: Outcome, action : int) -> int:
+    def event_index(self, outcome: Outcome, action: int) -> int:
         """
         Extract the discrete event index from an outcome.
         Used by the gluing operator and belief state update.
@@ -51,10 +51,7 @@ class WorldModel(ABC):
         Return new belief state after observing outcome under agent action.
         Does not mutate state.
         Policy needed by policy-dependent models (ignored by Bernoulli).
-        params: hypothesis params for the a-measure being updated; required
-            by stateful world models (e.g. SupraPOMDPWorldModel) that need
-            POMDP kernel matrices to propagate the belief. Ignored by
-            stateless world models (Bernoulli, Newcomb).
+        params: hypothesis params for the a-measure being updated.
         """
         pass
 
