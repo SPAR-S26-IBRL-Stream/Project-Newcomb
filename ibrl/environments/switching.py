@@ -1,6 +1,7 @@
 import numpy as np
 
 from . import BaseEnvironment
+from ..outcome import Outcome
 
 
 class SwitchingAdversaryEnvironment(BaseEnvironment):
@@ -18,7 +19,7 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
             switch_at = self.num_steps // 2
         self.switch_at = switch_at
 
-    def _resolve(self, env_action : int | None, action : int) -> float:
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
         self._step_count += 1
 
         # At switch_at, the 'best' arm moves to the other side
@@ -26,7 +27,7 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
             self.values = np.zeros((self.num_actions,))
             self.values[-1] = 1.0 # Move reward to the last arm
 
-        return self.random.normal(self.values[action], 0.1)
+        return Outcome(reward=self.random.normal(self.values[action], 0.1))
 
     def get_optimal_reward(self) -> float:
         return 1.0 # The maximum reward is always 1.0

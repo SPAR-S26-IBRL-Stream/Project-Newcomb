@@ -34,36 +34,27 @@ class BaseEnvironment(ABC):
         self.seed = seed
         self.verbose = verbose
 
+    @abstractmethod
     def step(self, probabilities : np.ndarray, action : int) -> Outcome:
         """Execute one round of interaction.
 
-        The environment first responds to the agent's policy (e.g. the predictor
-        samples a prediction), then resolves the payoff given the agent's action.
+        For standard bandits, this just samples an observation/reward based on the action
+        For Newcomb-like environments, there are two-steps:
+        - Respond to the agent's policy (e.g. the predictor samples a prediction)
+        - Resolve the payoff given the agent's action
 
         Arguments:
             probabilities: The agent's policy (probability distribution over actions)
             action:        The action sampled from the policy
 
         Returns:
-            Outcome containing the reward and any environment action
+            Outcome containing:
+                the obtained reward (float)
+                a discrete observation (int)
         """
-        env_action = self._respond(probabilities)
-        reward = self._resolve(env_action, action)
-        return Outcome(reward=reward, env_action=env_action)
-
-    def _respond(self, probabilities : np.ndarray) -> int | None:
-        """Environment's move given the agent's policy. Override in subclasses.
-
-        For Newcomb-like environments, this is where the predictor samples its
-        prediction. For standard bandits, returns None.
-        """
-        return None
-
-    @abstractmethod
-    def _resolve(self, env_action : int | None, action : int) -> float | tuple[float,int]:
-        """Determine the reward given both moves. Override in subclasses.
-        """
-        pass
+        observation = self._respond(probabilities)
+        reward = self._resolve(observation, action)
+        return Outcome(reward=reward, observation=observation)
 
     @abstractmethod
     def get_optimal_reward(self) -> float:

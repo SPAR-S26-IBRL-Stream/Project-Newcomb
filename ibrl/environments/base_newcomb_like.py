@@ -2,6 +2,7 @@ import numpy as np
 
 from . import BaseEnvironment
 from ..utils import sample_action
+from ..outcome import Outcome
 
 
 class BaseNewcombLikeEnvironment(BaseEnvironment):
@@ -28,15 +29,16 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
         self.reward_table = np.array(reward_table)
         self.predictor_accuracy = float(predictor_accuracy)
 
-    def _respond(self, probabilities : np.ndarray) -> int:
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
+        # Step 1: sample predicted action based on probabilities
         perfect_prediction = probabilities
         random_prediction = np.ones(self.num_actions) / self.num_actions
         prediction = perfect_prediction * (2*self.predictor_accuracy - 1) \
                     + random_prediction * (2 - 2*self.predictor_accuracy)
-        return sample_action(self.random, prediction)
-
-    def _resolve(self, env_action : int, action : int) -> float:
-        return self.reward_table[env_action, action]
+        predicted_action = sample_action(self.random, prediction)
+        # Step 2: get reward based on predicted and selected action
+        reward = self.reward_table[predicted_action, action]
+        return Outcome(reward=reward, observation=predicted_action)
 
     def get_optimal_reward(self) -> float:
         # Compute the optimal reward, based on the full reward table

@@ -1,6 +1,7 @@
 import numpy as np
 
 from . import BaseEnvironment
+from ..outcome import Outcome
 
 
 class BanditEnvironment(BaseEnvironment):
@@ -11,8 +12,8 @@ class BanditEnvironment(BaseEnvironment):
     according to a normal distribution centred on the average value.
     Upon initialisation, the average rewards are sampled from a standard normal distribution.
     """
-    def _resolve(self, env_action : int | None, action : int) -> float:
-        return self.random.normal(self.rewards[action], 1)
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
+        return Outcome(reward=self.random.normal(self.rewards[action], 1))
 
     def get_optimal_reward(self) -> float:
         return self.rewards.max()
