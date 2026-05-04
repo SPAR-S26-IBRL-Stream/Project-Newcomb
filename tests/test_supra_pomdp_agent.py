@@ -200,13 +200,20 @@ def test_supra_pomdp_transparent_newcomb_one_boxes():
     States: 0=predicted_one_box, 1=predicted_two_box.
     Observations: 0=box_full, 1=box_empty.
     θ₀(π) = (1-ε)·π_one_box + ε·0.5 — predictor reads the agent's policy.
-    Reward: one-box on full → 1.0; two-box → 0.1 (small); one-box on empty → 0.
+
+    Rewards:
+      one-box on full → 1.0; 
+      two-box → 0.1; 
+      one-box on empty → 0; 
+      two-box on full → 1.1
+
     IB agent should converge to one-boxing because its compute_q_values
     call passes the candidate policy into θ₀, making the predictor respond.
     """
     eps = 0.05
+
     num_actions = 2   # 0=one_box, 1=two_box
-    num_states = 2    # 0=predicted_one_box, 1=predicted_two_box
+    num_states = 2    # 0=predicted_one_box/full, 1=predicted_two_box/empty
     num_obs = 2       # 0=full, 1=empty
 
     wm = SupraPOMDPWorldModel(num_states=num_states, num_actions=num_actions,
@@ -216,14 +223,67 @@ def test_supra_pomdp_transparent_newcomb_one_boxes():
         p_one_box = (1 - eps) * pi[0] + eps * 0.5
         return np.array([p_one_box, 1. - p_one_box])
 
+
     T = np.zeros((num_states, num_actions, num_states))
     T[0, :, 0] = 1.; T[1, :, 1] = 1.  # state absorbed after action
-    B = np.eye(num_states)  # state 0 → obs=full, state 1 → obs=empty
+
+    B = np.eye(num_states)  # state 0 → observation=full, state 1 → observation=empty
+
+    #Reward table:
     R = np.zeros((num_states, num_actions, num_states))
-    R[0, 0, 0] = 1.0   # one-box on predicted_one_box → full → +1
-    R[1, 1, 1] = 0.1   # two-box on predicted_two_box → +0.1
+    R[0, 0, 0] = 1.0   # one-box on full → +1
+    R[1, 0, 1] = 0.0   # one-box on empty → +0
+    R[0, 1, 0] = 1.1   # two-box on full → big box + small box
+    R[1, 1, 1] = 0.1   # two-box on empty → small box only
 
     params = wm.make_params(T, B, theta_0_fn, R)
+
+    pure_one_box = np.array([1.0, 0.0])
+    pure_two_box = np.array([0.0, 1.0])
+
+    # Sanity check: θ₀ really depends on the agent policy.
+    #we verify that pure one-box policy → box full with probability 0.975
+    #and pure two-box policy → box full with probability 0.025
+    np.testing.assert_allclose(
+        theta_0_fn(pure_one_box),
+        np.array([0.975, 0.025]),
+    )
+    np.testing.assert_allclose(
+        theta_0_fn(pure_two_box),
+        np.array([0.025, 0.975]),
+    )
+
+    #If the predictor has already responded to a one-boxing policy, then the box is probably full
+    #so in that fixed situation two-boxing should be locally better because it also takes the small box.
+    q_one_box_policy = wm.compute_q_values(
+        wm.initial_state(),
+        params,
+        policy=pure_one_box,
+    )
+
+    assert q_one_box_policy[1] > q_one_box_policy[0], (
+        f"holding the predictor response fixed, two-boxing should be locally "
+        f"better; got Q={q_one_box_policy}"
+    )
+
+    #But as a committed policy, one-boxing should be better
+    #because committing to one-boxing makes the predictor fill the big box.
+    value_one_box_policy = float(np.dot(q_one_box_policy, pure_one_box))
+
+    q_two_box_policy = wm.compute_q_values(
+        wm.initial_state(),
+        params,
+        policy=pure_two_box,
+    )
+    value_two_box_policy = float(np.dot(q_two_box_policy, pure_two_box))
+
+    assert value_one_box_policy > value_two_box_policy, (
+        f"one-boxing should be better as a committed policy; "
+        f"got one-box value={value_one_box_policy}, "
+        f"two-box value={value_two_box_policy}"
+    )
+    
+
     hypothesis = Infradistribution([AMeasure(params)], world_model=wm)
     reward_fn = np.ones((num_actions, num_obs))
 
