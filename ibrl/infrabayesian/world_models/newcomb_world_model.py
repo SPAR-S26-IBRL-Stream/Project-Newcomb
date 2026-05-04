@@ -62,12 +62,17 @@ class NewcombWorldModel(WorldModel):
         assert len(params_list) == 1
         return params_list[0]
 
-    def event_index(self, outcome: Outcome, action : int) -> int:
-        for i in range(self.num_actions):
-            for j in range(self.num_actions):
-                if np.isclose(outcome.reward, self.reward_matrix[i,j]) and j==action:
-                    return i*self.num_actions + j
-        raise RuntimeError(f"Invalid outcome in Newcomb environment: {outcome}")
+    def event_index(self, outcome: Outcome) -> int:
+        indices = []
+        i = outcome.observation            # predicted action
+        for j in range(self.num_actions):  # selected action
+            if np.isclose(outcome.reward, self.reward_matrix[i,j]):
+                indices.append(i*self.num_actions + j)
+        if len(indices) == 0:
+            raise RuntimeError(f"Invalid outcome in Newcomb environment: {outcome}")
+        if len(indices) > 1:
+            raise RuntimeError(f"Ambiguous outcome in Newcomb environment: {outcome}")
+        return indices[0]
 
     def initial_state(self):
         return NewcombWorldModelBeliefState()
@@ -90,7 +95,7 @@ class NewcombWorldModel(WorldModel):
         P(outcome | belief_state, params, action) under this hypothesis.
         Returns a scalar in [0, 1].
         """
-        event = self.event_index(outcome, action)
+        event = self.event_index(outcome)
 
         # i: predicted action
         # j: selected action

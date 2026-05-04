@@ -80,7 +80,7 @@ class MultiBernoulliWorldModel(WorldModel):
             mixed.coefficients.append(mixed_coefficients)
         return mixed
 
-    def event_index(self, outcome: Outcome, action : int) -> int:
+    def event_index(self, outcome: Outcome) -> int:
         # For Bernoulli bandits reward is the event type, so this mapping is exact.
         return int(round(outcome.reward * (self.num_outcomes - 1)))
 
@@ -93,7 +93,7 @@ class MultiBernoulliWorldModel(WorldModel):
             action: int,
             policy: np.ndarray | None) -> BernoulliWorldModelBeliefState:
         new_state = BernoulliWorldModelBeliefState(state.history.copy())
-        new_state.history[action, self.event_index(outcome, action)] += 1
+        new_state.history[action, self.event_index(outcome)] += 1
         return new_state
 
     def is_initial(self, state: BernoulliWorldModelBeliefState) -> bool:
@@ -106,7 +106,7 @@ class MultiBernoulliWorldModel(WorldModel):
             action: int,
             policy: np.ndarray | None) -> float:
         probs = self._predictive(belief_state.history[action], params.log_probs[action], params.coefficients[action])
-        return float(probs[self.event_index(outcome, action)])
+        return float(probs[self.event_index(outcome)])
 
     def compute_expected_reward(self,
             belief_state: BernoulliWorldModelBeliefState,
