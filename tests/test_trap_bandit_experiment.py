@@ -10,6 +10,7 @@ from ibrl.infrabayesian.builders.trap_bandit import (
 )
 from experiments.alaro.trap_bandit.run import (
     REWARD_FUNCTION,
+    bootstrap_final_regret_percentile_cis,
     sample_action_from_uniform,
 )
 
@@ -40,6 +41,32 @@ def test_sample_action_from_uniform_reuses_common_draw():
     assert sample_action_from_uniform(np.array([0.5, 0.5]), 0.25) == 0
     assert sample_action_from_uniform(np.array([0.5, 0.5]), 0.75) == 1
     assert sample_action_from_uniform(np.array([0.2, 0.8]), 0.25) == 1
+
+
+def test_bootstrap_final_regret_percentile_cis_shapes():
+    results = {
+        "agent": {
+            "cumulative_expected_regret": np.array([
+                [0.0, 1.0],
+                [0.0, 2.0],
+                [0.0, 3.0],
+                [0.0, 4.0],
+            ])
+        }
+    }
+
+    bootstrap = bootstrap_final_regret_percentile_cis(
+        results,
+        num_bootstrap=20,
+        seed=123,
+    )
+
+    assert bootstrap["agent"]["point"].shape == (3,)
+    assert bootstrap["agent"]["ci"].shape == (3, 2)
+    np.testing.assert_allclose(
+        bootstrap["agent"]["point"],
+        np.percentile([1.0, 2.0, 3.0, 4.0], [5.0, 50.0, 95.0]),
+    )
 
 
 def test_ucb_tries_unpulled_actions():

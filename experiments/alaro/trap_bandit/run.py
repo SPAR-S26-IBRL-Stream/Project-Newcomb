@@ -225,6 +225,38 @@ def summarize_stacked(results: dict[str, dict]) -> dict:
     return summarize({kind: _unstack_runs(stacked) for kind, stacked in results.items()})
 
 
+def bootstrap_final_regret_percentile_cis(
+    results: dict[str, dict],
+    *,
+    num_bootstrap: int = 2000,
+    seed: int = 0,
+    percentiles: tuple[float, ...] = (5.0, 50.0, 95.0),
+    ci: tuple[float, float] = (2.5, 97.5),
+) -> dict:
+    """Bootstrap CIs for final cumulative expected-regret percentiles.
+
+    Resamples worlds with replacement. Each bootstrap replicate recomputes the
+    requested percentile over final cumulative expected regret.
+    """
+    rng = np.random.default_rng(seed)
+    output = {}
+    for kind, stacked in results.items():
+        final_regret = stacked["cumulative_expected_regret"][:, -1]
+        num_worlds = len(final_regret)
+        draws = np.empty((num_bootstrap, len(percentiles)))
+        for draw_idx in range(num_bootstrap):
+            indices = rng.integers(0, num_worlds, size=num_worlds)
+            draws[draw_idx] = np.percentile(final_regret[indices], percentiles)
+        point = np.percentile(final_regret, percentiles)
+        bounds = np.percentile(draws, ci, axis=0).T
+        output[kind] = {
+            "percentiles": list(percentiles),
+            "point": point,
+            "ci": bounds,
+        }
+    return output
+
+
 def summarize(results: dict) -> dict:
     summary = {}
     for kind, runs in results.items():
@@ -272,6 +304,7 @@ def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
             "correct": {"prior": [2.0, 2.0], "dgp": [2.0, 2.0]},
             "misspecified": {"prior": [2.0, 5.0], "dgp": [2.0, 2.0]},
             "severely_misspecified": {"prior": [1.0, 99.0], "dgp": [2.0, 2.0]},
+            "severely_pessimistic": {"prior": [99.0, 1.0], "dgp": [2.0, 2.0]},
             "mostly_safe_correct": {"prior": [1.0, 99.0], "dgp": [1.0, 99.0]},
         },
     }
@@ -293,6 +326,17 @@ def save_summary(summary: dict, output_path: Path) -> None:
                 "regret_p5_p50_p95": values[group_key]["regret_p5_p50_p95"].tolist(),
                 "trapped_p5_p50_p95": values[group_key]["trapped_p5_p50_p95"].tolist(),
             }
+    output_path.write_text(json.dumps(serializable))
+
+
+def save_bootstrap_summary(bootstrap: dict, output_path: Path) -> None:
+    serializable = {}
+    for kind, values in bootstrap.items():
+        serializable[kind] = {
+            "percentiles": values["percentiles"],
+            "point": values["point"].tolist(),
+            "ci": values["ci"].tolist(),
+        }
     output_path.write_text(json.dumps(serializable))
 
 
@@ -332,6 +376,8 @@ def run_and_save(
     output_dir: Path,
     kinds: list[str] | None = None,
     force: bool = False,
+    bootstrap_samples: int = 0,
+    bootstrap_seed: int = 0,
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     if kinds is None:
@@ -340,6 +386,7 @@ def run_and_save(
         "correct": {"prior": (2.0, 2.0), "dgp": config.alpha_dgp},
         "misspecified": {"prior": (2.0, 5.0), "dgp": config.alpha_dgp},
         "severely_misspecified": {"prior": (1.0, 99.0), "dgp": config.alpha_dgp},
+        "severely_pessimistic": {"prior": (99.0, 1.0), "dgp": config.alpha_dgp},
         "mostly_safe_correct": {"prior": (1.0, 99.0), "dgp": (1.0, 99.0)},
     }
     payload = config_payload(config, kinds)
@@ -367,8 +414,22 @@ def run_and_save(
             )
             save_raw_results(cache_path, condition_results)
             summary = summarize(condition_results)
+            stacked = {
+                kind: _stack_runs(runs)
+                for kind, runs in condition_results.items()
+            }
         summaries[name] = summary
         save_summary(summary, output_dir / f"{name}_summary.json")
+        if bootstrap_samples > 0:
+            bootstrap = bootstrap_final_regret_percentile_cis(
+                stacked,
+                num_bootstrap=bootstrap_samples,
+                seed=bootstrap_seed,
+            )
+            save_bootstrap_summary(
+                bootstrap,
+                output_dir / f"{name}_bootstrap_summary.json",
+            )
         plot_log_regret(
             summary,
             f"Trap bandit log cumulative regret ({name})",
@@ -398,6 +459,8 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--output-dir", type=Path, default=Path("experiments/alaro/trap_bandit/results"))
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--bootstrap-samples", type=int, default=0)
+    parser.add_argument("--bootstrap-seed", type=int, default=0)
     parser.add_argument(
         "--independent-action-draws",
         action="store_true",
@@ -425,6 +488,8 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         kinds=args.kinds,
         force=args.force,
+        bootstrap_samples=args.bootstrap_samples,
+        bootstrap_seed=args.bootstrap_seed,
     )
     for condition, summary in summaries.items():
         print(condition)
