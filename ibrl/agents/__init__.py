@@ -9,7 +9,6 @@ from .experimental1 import ExperimentalAgent1
 from .experimental2 import ExperimentalAgent2
 from .experimental3 import ExperimentalAgent3
 from .infrabayesian import InfraBayesianAgent
-from .thompson_bernoulli import ThompsonSamplingBernoulli
 from ..exploration import (
     EpsilonGreedy,
     ExplorationStrategy,
@@ -32,7 +31,6 @@ __all__ = [
     "ExperimentalAgent2",
     "ExperimentalAgent3",
     "InfraBayesianAgent",
-    "ThompsonSamplingBernoulli",
     "EpsilonGreedy",
     "ExplorationStrategy",
     "Greedy",
