@@ -14,16 +14,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v2
       - run: uv sync --extra test
-      - run: uv run pytest tests/test_smoke.py tests/test_supra_pomdp_smoke.py -v
+      - run: uv run pytest tests/test_smoke.py -v
 
-  unit-tests:
-    name: Unit Tests (Round 2)
+  agent-environment-tests:
+    name: Agent & Environment Tests (Round 2)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v2
       - run: uv sync --extra test
-      - run: uv run pytest tests/ -v --cov=ibrl --cov-report=term-missing --cov-fail-under=75
+      - run: uv run pytest tests/test_agents.py tests/test_environments.py tests/test_construction.py tests/test_simulator.py tests/test_ib_world_model.py -v --cov=ibrl --cov-report=term-missing --cov-fail-under=75
 
   supra-pomdp-tests:
     name: SupraPOMDP Tests (Round 3)
@@ -32,4 +32,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v2
       - run: uv sync --extra test
-      - run: uv run pytest tests/test_supra_pomdp_world_model.py tests/test_supra_pomdp_integration.py tests/test_supra_pomdp_agent.py -v --timeout=30
+      - run: uv run pytest tests/test_supra_pomdp_smoke.py tests/test_supra_pomdp_world_model.py tests/test_supra_pomdp_integration.py tests/test_supra_pomdp_agent.py tests/test_belief_dependent_agent.py tests/test_stateful_policy.py -v --timeout=30

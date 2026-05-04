@@ -36,7 +36,11 @@ python_classes = "Test*"
 python_functions = "test_*"
 addopts = "-v --tb=short"
 timeout = 30
-
+markers = [
+    "smoke: smoke tests (Round 1)",
+    "agent: agent and environment tests (Round 2)",
+    "pomdp: SupraPOMDP tests (Round 3)",
+]
 
 
 

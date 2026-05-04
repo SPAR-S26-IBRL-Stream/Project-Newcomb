@@ -1,6 +1,9 @@
+"""SupraPOMDPAgent — InfraBayesianAgent specialized for SupraPOMDP hypotheses."""
 from dataclasses import dataclass
 import numpy as np
-from typing import Callable, Tuple
+from typing import Callable
+
+from .infrabayesian import InfraBayesianAgent
 
 
 @dataclass
@@ -48,10 +51,72 @@ class StatefulPolicy:
         """Create uniform policy over all beliefs and actions."""
         policy_table = np.ones((num_beliefs, num_actions)) / num_actions
         return cls(policy_table, belief_indexer)
+
+
+class SupraPOMDPAgent(InfraBayesianAgent):
+    """
+    InfraBayesianAgent specialized for SupraPOMDP hypotheses.
+    
+    Computes belief-dependent policies by:
+    1. Discretizing the belief space
+    2. Computing Q-values for each (belief, action) pair
+    3. Optimizing a policy that conditions on belief
+    
+    The policy is recomputed after each update to reflect learned beliefs.
+    """
+    
+    def __init__(self, 
+                 num_actions: int,
+                 hypotheses: list,
+                 prior: np.ndarray,
+                 reward_function: np.ndarray,
+                 policy_discretisation: int = 10,
+                 policy_optimization: str = "greedy",
+                 softmax_beta: float = 1.0,
+                 exploration_prefix: int = 0,
+                 seed: int = 42,
+                 **kwargs):
         
+        super().__init__(
+            num_actions=num_actions,
+            hypotheses=hypotheses,
+            prior=prior,
+            reward_function=reward_function,
+            policy_discretisation=policy_discretisation,
+            policy_optimization=policy_optimization,
+            softmax_beta=softmax_beta,
+            exploration_prefix=exploration_prefix,
+            seed=seed,
+            **kwargs
+        )
+    
+    def get_probabilities(self) -> np.ndarray:
+        """
+        For SupraPOMDP with policy-dependent kernels, optimize over pure policies.
+        
+        For Transparent Newcomb: θ₀(π) depends on π, so we must evaluate
+        each candidate policy against the actual predictor response to that policy.
+        """
+        if self.current_stateful_policy is not None:
+            return self.current_stateful_policy.to_flat_policy()
+        
+        # For policy-dependent models, evaluate pure policies
+        # (one-hot distributions over actions)
+        pure_policies = np.eye(self.num_actions)
+        rewards = []
+        
+        for pure_policy in pure_policies:
+            # Evaluate this pure policy against all actions
+            action_values = np.array([
+                self.dist.evaluate_action(self.reward_function[a], a, pure_policy)
+                for a in range(self.num_actions)
+            ])
+            # Expected value of this policy: Σ_a π(a) * E[a]
+            policy_value = pure_policy @ action_values
+            rewards.append(policy_value)
+        
+        rewards = np.array(rewards)
+        return self.build_greedy_policy(rewards)
 
 
-## Code rationale :
 
-# captured belief-indexed action distributions
-# Provides with both direct indexing and callable interface
