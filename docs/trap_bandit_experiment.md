@@ -51,62 +51,56 @@ num_grid = 7
 p_cat = 0.01
 ```
 
-Generated artifacts:
-
-- [config.json](../experiments/alaro/trap_bandit/results_small/config.json)
-- raw caches: `*_raw.npz`
-- [correct_summary.json](../experiments/alaro/trap_bandit/results_small/correct_summary.json)
-- [misspecified_summary.json](../experiments/alaro/trap_bandit/results_small/misspecified_summary.json)
-- [severely_misspecified_summary.json](../experiments/alaro/trap_bandit/results_small/severely_misspecified_summary.json)
-- [mostly_safe_correct_summary.json](../experiments/alaro/trap_bandit/results_small/mostly_safe_correct_summary.json)
-- [correct_grid.png](../experiments/alaro/trap_bandit/results_small/correct_grid.png)
-- [misspecified_grid.png](../experiments/alaro/trap_bandit/results_small/misspecified_grid.png)
-- [severely_misspecified_grid.png](../experiments/alaro/trap_bandit/results_small/severely_misspecified_grid.png)
-- [mostly_safe_correct_grid.png](../experiments/alaro/trap_bandit/results_small/mostly_safe_correct_grid.png)
 
 Each result figure has six subplots. Columns are `log(1 + cumulative expected regret)` and `argmax(p1,p2)` pull rate. Rows are overall average, safe worlds, and risky worlds.
 
-![Correct-prior grid](../experiments/alaro/trap_bandit/results_small/correct_grid.png)
+![Correct-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/correct_grid.png)
 
 Figure 2a. Correct-prior results.
 
-![Misspecified-prior grid](../experiments/alaro/trap_bandit/results_small/misspecified_grid.png)
+In the first experiment, the bayesian agent with a correctly specified prior has very similar behavior to the infra-bayesian agent, which maintains knightian uncertainty on whether it is in a risky world or not. They behave nearly identically in this setting because it is not favorable under this data generating process for an expected value maximizer to pull the risky arm. A key positive finding is that the infra-bayesian learner does properly learn which of the two arms is the risky one, at which point it can begin to behave safely. Next, we examine the results of two improperly specified priors the probability of the world being risky.
+
+![Misspecified-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/misspecified_grid.png)
 
 Figure 2b. Misspecified-prior results.
 
-![Severely misspecified-prior grid](../experiments/alaro/trap_bandit/results_small/severely_misspecified_grid.png)
+In the first, slightly misspecified prior setting (prior Beta(2,5) vs data generating process Beta(2,2)), results between the bayesian and infra-bayesian agents diverge slightly but not significantly.  
+
+![Severely misspecified-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/severely_misspecified_grid.png)
 
 Figure 2c. Severely misspecified-prior results.
 
-![Mostly-safe correct-prior grid](../experiments/alaro/trap_bandit/results_small/mostly_safe_correct_grid.png)
+However, in the extremely misspecfied prior setting (prior Beta(1,99) vs data generating process Beta(2,2)), the Bayesian agent incurs significant regret by pulling the risky arm until it adjusts its posterior enough to reflect the actual world and begins to act more conservatively (as is optimal expected value maximization in this setting). Finally, we change the data generating process to have alpha ~ Beta(1,99) and show the results below. 
+
+![Mostly-safe correct-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/mostly_safe_correct_grid.png)
 
 Figure 2d. Mostly-safe correctly specified prior results.
 
-Final cumulative expected-regret percentiles from this downscaled run:
+Here, the infra-bayesian agent can be seen to drastically underperform in cumulative regret because of course it is maintaining knightian uncertainty about the high reward arm being risky.
+
+# Summary
+
+Across these experiments, infra-Bayes behaves conservatively in a way that protects it from not knowing whether the world is risky: when Bayes has a misspecified prior that strongly underestimates risky worlds, greedy Bayes pulls the high-reward/high-risk arm more often and suffers worse regret, while IB’s performance is stable. With a correct or mildly misspecified prior, greedy Bayes and IB are broadly similar in worlds where it "pays" to pull the guaranteed-safe arm. The tradeoff is clear in the mostly-safe, correctly specified setting (ie where it "pays" to pull the risky arm): Bayes exploits the high-reward arm and achieves much lower regret, while IB remains cautious because the risky-world hypothesis is still live.
+
+# Appendix
+
+Final cumulative expected-regret percentiles from `results_100_common_draws`:
 
 | condition | agent | catastrophe rate | p5 | p50 | p95 |
 | --- | --- | ---: | ---: | ---: | ---: |
-| correct | bayes_greedy | 0.10 | 0.00 | 20.14 | 583.28 |
-| correct | bayes_thompson | 0.40 | 15.93 | 59.14 | 942.93 |
-| correct | bayes_ucb | 0.40 | 11.29 | 141.17 | 1632.10 |
-| correct | ib | 0.10 | 0.00 | 20.14 | 583.28 |
-| misspecified | bayes_greedy | 0.10 | 0.00 | 25.05 | 583.28 |
-| misspecified | bayes_thompson | 0.45 | 8.18 | 78.89 | 938.70 |
-| misspecified | bayes_ucb | 0.40 | 11.29 | 141.17 | 1632.10 |
-| misspecified | ib | 0.10 | 0.00 | 20.14 | 583.28 |
-| severely misspecified | bayes_greedy | 0.40 | 0.00 | 38.41 | 1065.86 |
-| severely misspecified | bayes_thompson | 0.40 | 2.29 | 74.19 | 1094.63 |
-| severely misspecified | bayes_ucb | 0.40 | 11.29 | 141.17 | 1632.10 |
-| severely misspecified | ib | 0.10 | 0.00 | 20.14 | 583.28 |
-| mostly safe correct | bayes_greedy | 0.00 | 0.00 | 0.72 | 45.60 |
-| mostly safe correct | bayes_thompson | 0.00 | 1.32 | 3.22 | 11.90 |
-| mostly safe correct | bayes_ucb | 0.00 | 2.56 | 12.39 | 20.46 |
-| mostly safe correct | ib | 0.00 | 0.77 | 33.93 | 141.06 |
-
-Interpretation so far: in the correct-prior and mildly misspecified conditions, the IB agent behaves very similarly to greedy Bayesian planning. Under severe misspecification (`alpha ~ Beta(1,99)` for the Bayesian prior), greedy Bayesian planning pulls the would-be trapped high-bias arm more often and suffers more catastrophes, while the IB agent remains unchanged because it keeps Knightian uncertainty over safe vs risky worlds. Thompson sampling and UCB explore more aggressively and therefore suffer more catastrophes and worse upper-tail regret across conditions.
-
-The mostly-safe correctly specified condition shows the opposite side of the tradeoff: when the world is in fact almost always safe and the Bayesian prior knows this, Bayesian agents exploit the high-bias arm profitably, while the IB agent remains conservative because it still keeps the risky-world family live.
-
-The trapped-arm pull-rate plots show the rate of pulling `argmax(p1,p2)`. In risky worlds this is the high-reward/high-risk arm; in safe worlds it is not actually dangerous, but it is the arm that would be trapped if the world were risky.
-
-The runner caches raw simulation arrays as `*_raw.npz` files. Re-running the plotting command with the same config regenerates summaries and figures from cache; pass `--force` to rerun simulation.
+| correct | bayes_greedy | 0.18 | 0.00 | 23.11 | 1139.28 |
+| correct | bayes_thompson | 0.33 | 5.05 | 38.19 | 1204.03 |
+| correct | bayes_ucb | 0.38 | 4.73 | 19.86 | 1482.44 |
+| correct | ib | 0.18 | 0.00 | 29.86 | 1139.28 |
+| misspecified | bayes_greedy | 0.18 | 0.00 | 23.11 | 1137.81 |
+| misspecified | bayes_thompson | 0.40 | 3.95 | 24.54 | 1491.57 |
+| misspecified | bayes_ucb | 0.38 | 4.73 | 19.86 | 1482.44 |
+| misspecified | ib | 0.18 | 0.00 | 29.86 | 1139.28 |
+| severely misspecified | bayes_greedy | 0.37 | 0.00 | 23.12 | 1829.15 |
+| severely misspecified | bayes_thompson | 0.43 | 1.42 | 10.58 | 1625.97 |
+| severely misspecified | bayes_ucb | 0.38 | 4.73 | 19.86 | 1482.44 |
+| severely misspecified | ib | 0.18 | 0.00 | 29.86 | 1139.28 |
+| mostly safe correct | bayes_greedy | 0.00 | 0.00 | 0.67 | 23.66 |
+| mostly safe correct | bayes_thompson | 0.00 | 0.83 | 3.91 | 12.53 |
+| mostly safe correct | bayes_ucb | 0.00 | 1.99 | 10.62 | 16.55 |
+| mostly safe correct | ib | 0.00 | 0.00 | 33.10 | 141.04 |
