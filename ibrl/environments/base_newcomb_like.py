@@ -35,8 +35,8 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
                     + random_prediction * (2 - 2*self.predictor_accuracy)
         return sample_action(self.random, prediction)
 
-    def _resolve(self, env_action : int, action : int) -> float:
-        return self.reward_table[env_action, action]
+    def _resolve(self, observation : int, action : int) -> float:
+        return self.reward_table[observation, action]
 
     def get_optimal_reward(self) -> float:
         # Compute the optimal reward, based on the full reward table

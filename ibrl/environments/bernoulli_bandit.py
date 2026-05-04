@@ -16,7 +16,7 @@ class BernoulliBanditEnvironment(BaseEnvironment):
         super().__init__(**kwargs)
         self._fixed_probs = np.array(probs, dtype=float) if probs is not None else None
 
-    def _resolve(self, env_action: int | None, action: int) -> float:
+    def _resolve(self, observation: int | None, action: int) -> float:
         outcome = int(self.random.random() < self.probs[action])
         return float(outcome)
 

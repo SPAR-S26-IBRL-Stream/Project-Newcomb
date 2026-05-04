@@ -18,7 +18,7 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
             switch_at = self.num_steps // 2
         self.switch_at = switch_at
 
-    def _resolve(self, env_action : int | None, action : int) -> float:
+    def _resolve(self, observation : int | None, action : int) -> float:
         self._step_count += 1
 
         # At switch_at, the 'best' arm moves to the other side

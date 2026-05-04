@@ -41,7 +41,7 @@ class BaseAgent(ABC):
         Arguments:
             probabilities: The probability distribution over actions given by the agent
             action:        The action that was selected from the probability distribution
-            outcome:       The full outcome (reward + env_action)
+            outcome:       The full outcome (reward + observation)
         """
         self.step += 1
 
