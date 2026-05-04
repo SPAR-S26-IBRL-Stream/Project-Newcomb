@@ -16,6 +16,12 @@ class NewcombWorldModelParameters:
     """
     predictor_accuracy : float
 
+@dataclass
+class NewcombWorldModelBeliefState:
+    """
+    Belief is stateless
+    """
+    pass
 
 # Outcomes: {0, A, B, A+B} with small box A, large box B
 # Actions: {1, 2} for one/two box
@@ -45,6 +51,7 @@ class NewcombWorldModel(WorldModel):
             self.reward_matrix = reward_matrix
         
         self.num_actions = self.reward_matrix.shape[0]
+        assert self.reward_matrix.shape == (self.num_actions, self.num_actions)
 
     def make_params(self, predictor_accuracy=1) -> NewcombWorldModelParameters:
         assert 0.5 <= predictor_accuracy <= 1.0
@@ -63,20 +70,20 @@ class NewcombWorldModel(WorldModel):
         raise RuntimeError(f"Invalid outcome in Newcomb environment: {outcome}")
 
     def initial_state(self):
-        return None
+        return NewcombWorldModelBeliefState()
 
     def update_state(self, state,
             outcome : Outcome,
             action : int,
             policy : np.ndarray):
-        pass
+        return state
 
     def is_initial(self, state) -> bool:
         return True
 
     def compute_likelihood(self, belief_state,
             outcome : Outcome,
-            params : NewcombWorldModel,
+            params : NewcombWorldModelParameters,
             action : int,
             policy : np.ndarray) -> float:
         """
@@ -94,13 +101,12 @@ class NewcombWorldModel(WorldModel):
         prediction = perfect_prediction * (2*params.predictor_accuracy - 1) \
                     + random_prediction * (2 - 2*params.predictor_accuracy)
 
-        # Likelihood is just probability of prediction because the action is fixed (?)
+        # Likelihood is just probability of prediction because the action is fixed
         return prediction[i]
-        #return prediction[i]*policy[j]
 
     def compute_expected_reward(self, belief_state,
             reward_function : np.ndarray,
-            params : NewcombWorldModel,
+            params : NewcombWorldModelParameters,
             action : int,
             policy : np.ndarray) -> float:
         """
@@ -111,11 +117,7 @@ class NewcombWorldModel(WorldModel):
         random_prediction = np.ones_like(policy) / len(policy)
         prediction = perfect_prediction * (2*params.predictor_accuracy - 1) \
                     + random_prediction * (2 - 2*params.predictor_accuracy)
-        #rewards = prediction @ self.reward_matrix
-        reward_matrix = np.array([
-            [reward_function[0], reward_function[1]],
-            [reward_function[2], reward_function[3]]
-        ])
+        reward_matrix = np.reshape(reward_function, (self.num_actions,self.num_actions))
         rewards = prediction @ reward_matrix
         return rewards[action]
 
@@ -127,11 +129,17 @@ class NewcombWorldModel(WorldModel):
             each element indicating the reward of a given outcome after taking a given action
         This function converts the world model's reward table to a format suitable for the agent
         """
-        matrix = np.array([
-            [self.reward_matrix[0,0], float("nan"), self.reward_matrix[1,0], float("nan")],  # action one-box
-            [float("nan"), self.reward_matrix[0,1], float("nan"), self.reward_matrix[1,1]]   # action two-box
-        ])
+        # num_outcomes = num_actions**2; one outcome per (action predicted, action taken) pair
+        matrix = np.empty((self.num_actions, self.num_actions**2))
+        for i in range(self.num_actions):
+            # For each action, fill only the values from the associated column of the reward matrix
+            # Leave everything else NaN, to avoid accidentally using wrong values later on
+            matrix_i = np.full((self.num_actions,self.num_actions), float("nan"))
+            matrix_i[:,i] = self.reward_matrix[:,i]
+            matrix[i] = np.reshape(matrix_i, (self.num_actions**2,))
+
         # Normalise rewards to [0,1]
+        assert self.reward_matrix.max() > self.reward_matrix.min()
         return (matrix - self.reward_matrix.min()) / (self.reward_matrix.max() - self.reward_matrix.min())
 
     def to_str(self, params):

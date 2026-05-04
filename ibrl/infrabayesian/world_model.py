@@ -46,7 +46,7 @@ class WorldModel(ABC):
 
     @abstractmethod
     def update_state(self, state, outcome: Outcome, action: int,
-                     policy: np.ndarray):
+                     policy: np.ndarray | None):
         """
         Return new belief state after observing outcome under agent action.
         Does not mutate state.
@@ -61,7 +61,7 @@ class WorldModel(ABC):
 
     @abstractmethod
     def compute_likelihood(self, belief_state, outcome: Outcome, params,
-                           action: int, policy: np.ndarray) -> float:
+                           action: int, policy: np.ndarray | None) -> float:
         """
         P(outcome | belief_state, params, action) under this hypothesis.
         Returns a scalar in [0, 1].
@@ -70,7 +70,7 @@ class WorldModel(ABC):
 
     @abstractmethod
     def compute_expected_reward(self, belief_state, reward_function: np.ndarray,
-                                params, action: int, policy: np.ndarray) -> float:
+                                params, action: int, policy: np.ndarray | None) -> float:
         """
         E[reward_function(outcome) | belief_state, params, action].
         Returns a scalar.

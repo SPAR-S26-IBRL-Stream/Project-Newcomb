@@ -66,7 +66,7 @@ class Infradistribution:
                    components[0].world_model)
 
     def evaluate_action(self, reward_function : np.ndarray, action : int,
-                        policy : np.ndarray) -> float:
+                        policy : np.ndarray | None) -> float:
         """
         Pessimistic expected value of a given reward function
         Defined as minimal expected value over all minimal points
@@ -76,7 +76,7 @@ class Infradistribution:
                    for measure in self.measures)
 
     def update(self, reward_function : np.ndarray, outcome : Outcome,
-               action : int, policy : np.ndarray) -> None:
+               action : int, policy : np.ndarray | None) -> None:
         """
         Update all a-measures upon seeing a certain event using a given reward function
         This is Definition 11 from Basic Inframeasure Theory

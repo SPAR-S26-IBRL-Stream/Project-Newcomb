@@ -65,14 +65,14 @@ class InfraBayesianAgent(BaseGreedyAgent):
     def get_probabilities(self) -> np.ndarray:
         # Greedy policy: reproduces classical agent, breaks regret bounds
         if self.exploration_prefix is None:
-            return self.build_greedy_policy(self._expected_rewards())
+            return self.build_greedy_policy(self._optimal_policy())
 
         # Forced exploration prefix: regret bounds asymptotically preserved
-        if self.step < self.exploration_prefix:
+        if self.step <= self.exploration_prefix:
             return np.ones(self.num_actions) / self.num_actions
 
         # Use optimal policy: no exploration, almost no learning
-        return self._expected_rewards()
+        return self._optimal_policy()
 
     def dump_state(self) -> str:
         state = str(self.dist.belief_state)
@@ -81,13 +81,17 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return state
 
     def _expected_rewards(self) -> np.ndarray:
+        """Expected reward of each policy"""
         # Iterate over policies and compute expected reward: E[π] = Σ_a E_π[a] π(a)
-        expected_rewards = np.array([sum(
+        return np.array([sum(
             self.dist.evaluate_action(self.reward_function[a], a, policy) * policy[a]
                 for a in range(self.num_actions)
             ) for policy in self.policies
         ])
 
+    def _optimal_policy(self) -> np.ndarray:
+        """Policy that maximises expected reward"""
+        expected_rewards = self._expected_rewards()
         # Find all optimal policies, sum them up and normalise
         optimal_policies = np.isclose(expected_rewards, expected_rewards.max())
         return (self.policies*np.expand_dims(optimal_policies,axis=1)).sum(axis=0) / sum(optimal_policies)
