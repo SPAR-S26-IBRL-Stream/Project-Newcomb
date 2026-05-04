@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, '**']  # Run on all branches
 
 jobs:
   smoke-tests:
@@ -33,3 +33,6 @@ jobs:
       - uses: astral-sh/setup-uv@v2
       - run: uv sync --extra test
       - run: uv run pytest tests/test_supra_pomdp_smoke.py tests/test_supra_pomdp_world_model.py tests/test_supra_pomdp_integration.py tests/test_supra_pomdp_agent.py tests/test_belief_dependent_agent.py tests/test_stateful_policy.py -v --timeout=30
+      
+      
+
