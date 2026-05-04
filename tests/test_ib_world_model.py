@@ -142,8 +142,7 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     db = DiscreteBayesianAgent(num_actions=n, num_hypotheses=num_hypotheses,
                                epsilon=0.0, seed=0)
     ib = InfraBayesianAgent(num_actions=n, hypotheses=hypotheses,
-                        prior=np.array([1.0]), reward_function=np.ones((n, 2)),
-                        epsilon=0.0, seed=0)
+                            prior=np.array([1.0]), epsilon=0.0, seed=0)
     db.reset()
     ib.reset()
 
