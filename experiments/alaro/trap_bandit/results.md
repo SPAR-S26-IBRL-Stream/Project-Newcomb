@@ -54,25 +54,25 @@ p_cat = 0.01
 
 Each result figure has six subplots. Columns are `log(1 + cumulative expected regret)` and `argmax(p1,p2)` pull rate. Rows are overall average, safe worlds, and risky worlds.
 
-![Correct-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/correct_grid.png)
+![Correct-prior grid](results_100_common_draws/correct_grid.png)
 
 Figure 2a. Correct-prior results.
 
 In the first experiment, the bayesian agent with a correctly specified prior has very similar behavior to the infra-bayesian agent, which maintains knightian uncertainty on whether it is in a risky world or not. They behave nearly identically in this setting because it is not favorable under this data generating process for an expected value maximizer to pull the risky arm. A key positive finding is that the infra-bayesian learner does properly learn which of the two arms is the risky one, at which point it can begin to behave safely. Next, we examine the results of two improperly specified priors the probability of the world being risky.
 
-![Misspecified-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/misspecified_grid.png)
+![Misspecified-prior grid](results_100_common_draws/misspecified_grid.png)
 
 Figure 2b. Misspecified-prior results.
 
 In the first, slightly misspecified prior setting (prior Beta(2,5) vs data generating process Beta(2,2)), results between the bayesian and infra-bayesian agents diverge slightly but not significantly.  
 
-![Severely misspecified-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/severely_misspecified_grid.png)
+![Severely misspecified-prior grid](results_100_common_draws/severely_misspecified_grid.png)
 
 Figure 2c. Severely misspecified-prior results.
 
 However, in the extremely misspecfied prior setting (prior Beta(1,99) vs data generating process Beta(2,2)), the Bayesian agent incurs significant regret by pulling the risky arm until it adjusts its posterior enough to reflect the actual world and begins to act more conservatively (as is optimal expected value maximization in this setting). Finally, we change the data generating process to have alpha ~ Beta(1,99) and show the results below. 
 
-![Mostly-safe correct-prior grid](../experiments/alaro/trap_bandit/results_100_common_draws/mostly_safe_correct_grid.png)
+![Mostly-safe correct-prior grid](results_100_common_draws/mostly_safe_correct_grid.png)
 
 Figure 2d. Mostly-safe correctly specified prior results.
 
