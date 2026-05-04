@@ -28,8 +28,6 @@ We compare classical Bayesian agents and an infra-Bayesian agent using the same 
 
 In the first experiment, all Bayesian priors match the data-generating process: `alpha ~ Beta(2,2)` and `p1,p2 ~ Beta(2,2)`. In the second and third experiments, we run increasingly misspecified-prior conditions where Bayesian agents put lower-than-actual probability on the risky world, using `alpha ~ Beta(2,5)` and `alpha ~ Beta(1,99)`. Finally, in our fourth experiment, we change the data generating process to be mostly safe (`alpha ~ Beta(1,99)`), such that the expected value maximizer would risk pulling the risky arm. We correctly specify the prior in this condition. The infra-Bayesian agent always shares the same classical `p1,p2` prior as the Bayesian agent but maintains Knightian uncertainty over whether the world is safe or risky.
 
-We also include a mostly-safe, correctly specified condition. Since `alpha` denotes probability of a risky world, this is implemented as `alpha ~ Beta(1,99)`, equivalent to a `Beta(99,1)` prior over being safe.
-
 For Bayesian agents, we compare three exploration strategies:
 
 - greedy,
@@ -40,9 +38,9 @@ For the infra-Bayesian agent, we use greedy action selection over its robust low
 
 Regret is measured against the best policy with full knowledge of the true world. We report cumulative expected regret percentiles and trapped-arm pull-rate percentiles.
 
-## Preliminary Downscaled Results
+## Results
 
-The current implementation is in `experiments/alaro/trap_bandit/` and the following results were generated using the below configs:
+The implementation is in `experiments/alaro/trap_bandit/` and the results were generated using the below configs:
 
 ```text
 num_worlds = 100
@@ -51,14 +49,15 @@ num_grid = 7
 p_cat = 0.01
 ```
 
-
 Each result figure has six subplots. Columns are `log(1 + cumulative expected regret)` and `argmax(p1,p2)` pull rate. Rows are overall average, safe worlds, and risky worlds.
 
 ![Correct-prior grid](results_100_common_draws/correct_grid.png)
 
 Figure 2a. Correct-prior results.
 
-In the first experiment, the bayesian agent with a correctly specified prior has very similar behavior to the infra-bayesian agent, which maintains knightian uncertainty on whether it is in a risky world or not. They behave nearly identically in this setting because it is not favorable under this data generating process for an expected value maximizer to pull the risky arm. A key positive finding is that the infra-bayesian learner does properly learn which of the two arms is the risky one, at which point it can begin to behave safely. Next, we examine the results of two improperly specified priors the probability of the world being risky.
+In the first experiment, the bayesian agent with a correctly specified prior has very similar behavior to the infra-bayesian agent, which maintains knightian uncertainty on whether it is in a risky world or not. They behave nearly identically in this setting because it is not favorable under this data generating process for an expected value maximizer to pull the risky arm. A key positive finding is that the infra-bayesian learner does properly learn which of the two arms is the risky one, at which point it can begin to behave safely. Notably, both non-greedy exploration strategies show significant regret in the risky worlds. 
+
+Next, we examine the results of two improperly specified priors the probability of the world being risky.
 
 ![Misspecified-prior grid](results_100_common_draws/misspecified_grid.png)
 
