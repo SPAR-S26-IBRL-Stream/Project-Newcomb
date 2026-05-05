@@ -107,6 +107,57 @@ tree, lifting its worst-case cumulative reward from 2.78 to 2.85.
 This section answers questions raised on the team chat. The setup is small
 but unusual, and several details are worth pinning down explicitly.
 
+### Couldn't a Bayesian just randomise its t=0 tie and win? (the RNG assumption)
+
+In this perfectly symmetric setup, a Bayesian who knows about Omega could
+randomise its first pull 50/50 between Arm 0 and Arm 1 and obtain
+`V^Red = V^Blue = 2.90` by symmetry — apparently beating the IB value of
+`2.85`.
+
+Under the threat model assumed in this experiment this does **not** work,
+because **Omega has access to the agent's full policy *including* its
+randomisation source.** Concretely Omega is assumed to be able to read the
+agent's RNG / pseudo-random generator, so any "mixed" policy is, from
+Omega's point of view, just a deterministic policy of the joint
+`(history, RNG-tape)` state. Omega evaluates it under the realised RNG
+output and adversarially commits to the casino that minimises the
+*seed-conditional* expected reward — not the policy-distribution-averaged
+one. So a 50/50 mixed Bayesian still gets `min(V^Red, V^Blue) = 2.78` on
+every realisation; mixing buys nothing.
+
+This is why **restricting both agents to deterministic policies is without
+loss of generality** under this threat model: randomisation is
+indistinguishable from a deterministic policy that depends on the RNG
+output. And it is the like-for-like comparison anyway, since classical
+Bayesian decision-making is itself **deterministic at the optimum** — it
+picks the posterior-mean-maximising arm with some fixed tie-break.
+
+A clarification on scope: IB as a formalism *can* technically express the
+weaker minmax setup where Omega only sees the policy *distribution* and not
+the realised draw — you'd just put the randomisation source inside `Ψ`
+rather than outside it. We're not saying IB is incompatible with that
+model. The point is that the demonstration here — "IB's worst-case
+guarantee strictly improves on Bayes under an unrestricted adversary" —
+uses the canonical strong-Omega framing, because under the weaker framing
+symmetric mixing washes the gap out and there's nothing to show on a
+symmetric problem. So the other threat model is expressible in IB; it's
+just not where the IB-vs-Bayes contrast lives.
+
+### Why does the IB output show V_Red ≠ V_Blue when the problem is symmetric?
+
+The Pareto DP returns `V^Red = 2.8584` and `V^Blue = 2.8472` even though the
+Red/Blue swap is an exact symmetry of the problem. This is a **consequence
+of the deterministic-policy restriction, not a bug**: among deterministic
+policies the Pareto frontier passes from `V^Red > V^Blue` to
+`V^Red < V^Blue` without any single deterministic point sitting *exactly* on
+`V^Red = V^Blue`. The IB optimum is the deterministic frontier point closest
+to the diagonal — just above it. A mixed policy could land on the diagonal
+exactly, but under the RNG assumption above we don't have access to mixed
+policies. The relevant headline number is therefore
+`min(V^Red, V^Blue) = 2.8472`, which is what Omega actually leaves on the
+table; the small `0.0112` Red/Blue gap is a deterministic-policy
+discretisation artefact, not an algorithmic error.
+
 ### What exactly is the environment? Multiple episodes or one?
 
 There is **one episode of length `T`** (the notebook runs `T=5`; up to `T≈10`
