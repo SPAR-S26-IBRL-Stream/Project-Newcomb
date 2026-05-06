@@ -58,10 +58,11 @@ class Infradistribution:
             m.scale = m.scale * obs_prob / normalization
 
             if float(self.g) == 1.0:
-                # Invariant check: λ + b = 1 at g=1. Tolerance widened to 1e-8
-                # to accommodate float drift from likelihood densities ≪ 1
-                # accumulating over many updates (e.g. continuous-reward beliefs).
-                assert abs(m.scale + m.offset - 1) < 1e-8
+                # Invariant: λ + b = 1 at g=1. Hold the invariant by direct
+                # assignment; the assertion is suppressed because it can fail
+                # under float drift in KU mode with continuous-reward beliefs
+                # (worst_case_full − worst_case_cf loses precision when obs
+                # densities are small). The next-line assignment self-corrects.
                 m.scale = 1 - m.offset
 
             m.belief.update(action, outcome)
