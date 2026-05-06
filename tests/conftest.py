@@ -1,10 +1,16 @@
 import pytest
 import numpy as np
+import sys
+from pathlib import Path
 from ibrl.agents import QLearningAgent, BayesianAgent, EXP3Agent
 from ibrl.environments import (
     BanditEnvironment, NewcombEnvironment, DeathInDamascusEnvironment,
     CoordinationGameEnvironment, PolicyDependentBanditEnvironment
 )
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 @pytest.fixture
