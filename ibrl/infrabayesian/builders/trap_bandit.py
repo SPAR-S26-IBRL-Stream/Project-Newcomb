@@ -52,27 +52,26 @@ def make_trap_bandit_family(
     wm: JointBanditWorldModel,
     *,
     world_type: str,
-    p_grid: np.ndarray,
-    p_weights: np.ndarray,
+    p_pairs: list[tuple[float, ...]],
+    p_pair_weights: np.ndarray,
     p_cat: float,
 ) -> Infradistribution:
     components = []
     weights = []
-    for i, p1 in enumerate(p_grid):
-        for j, p2 in enumerate(p_grid):
-            p_values = np.array([p1, p2], dtype=float)
-            components.append(
-                JointBanditComponent(
-                    trap_bandit_probs(p_values, world_type=world_type, p_cat=p_cat),
-                    metadata={
-                        "world_type": world_type,
-                        "p_values": p_values,
-                        "p_cat": p_cat,
-                        "trapped_arm": int(np.argmax(p_values)),
-                    },
-                )
+    for p_pair, weight in zip(p_pairs, p_pair_weights):
+        p_values = np.array(p_pair, dtype=float)
+        components.append(
+            JointBanditComponent(
+                trap_bandit_probs(p_values, world_type=world_type, p_cat=p_cat),
+                metadata={
+                    "world_type": world_type,
+                    "p_values": p_values,
+                    "p_cat": p_cat,
+                    "trapped_arm": int(np.argmax(p_values)),
+                },
             )
-            weights.append(float(p_weights[i] * p_weights[j]))
+        )
+        weights.append(float(weight))
     params = wm.make_params(components, np.asarray(weights, dtype=float))
     return Infradistribution([AMeasure(params)], world_model=wm)
 
@@ -82,15 +81,38 @@ def make_trap_bandit_hypotheses(
     num_grid: int = 19,
     p_cat: float = 0.01,
     p_beta: tuple[float, float] = (2.0, 2.0),
+    p_pairs: list[tuple[float, ...]] | None = None,
+    p_pair_weights: np.ndarray | None = None,
 ) -> tuple[JointBanditWorldModel, Infradistribution, Infradistribution]:
     wm = JointBanditWorldModel(num_arms=2, num_outcomes=3)
-    p_grid = make_p_grid(num_grid, p_cat)
-    p_weights = beta_grid_weights(p_grid, *p_beta)
+    if p_pairs is None:
+        p_grid = make_p_grid(num_grid, p_cat)
+        p_weights = beta_grid_weights(p_grid, *p_beta)
+        p_pairs = [
+            (float(p1), float(p2))
+            for p1 in p_grid
+            for p2 in p_grid
+        ]
+        p_pair_weights = np.array([
+            float(w1 * w2)
+            for w1 in p_weights
+            for w2 in p_weights
+        ])
+    elif p_pair_weights is None:
+        p_pair_weights = np.ones(len(p_pairs)) / len(p_pairs)
     safe = make_trap_bandit_family(
-        wm, world_type="safe", p_grid=p_grid, p_weights=p_weights, p_cat=p_cat
+        wm,
+        world_type="safe",
+        p_pairs=p_pairs,
+        p_pair_weights=np.asarray(p_pair_weights, dtype=float),
+        p_cat=p_cat,
     )
     risky = make_trap_bandit_family(
-        wm, world_type="risky", p_grid=p_grid, p_weights=p_weights, p_cat=p_cat
+        wm,
+        world_type="risky",
+        p_pairs=p_pairs,
+        p_pair_weights=np.asarray(p_pair_weights, dtype=float),
+        p_cat=p_cat,
     )
     return wm, safe, risky
 

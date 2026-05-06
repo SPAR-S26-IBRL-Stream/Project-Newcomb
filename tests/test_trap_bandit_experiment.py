@@ -82,6 +82,16 @@ def test_uniform_p_beta_samples_valid_uniform_range():
     assert all(0.0 <= sample["p2"] <= 0.95 for sample in samples)
 
 
+def test_separated_p_mode_samples_only_low_high_assignments():
+    rng = np.random.default_rng(123)
+    config = TrapBanditConfig(p_mode="separated", p_low=0.3, p_high=0.7)
+
+    samples = [sample_world(rng, config) for _ in range(50)]
+
+    assert all({sample["p1"], sample["p2"]} == {0.3, 0.7} for sample in samples)
+    assert {sample["p1"] for sample in samples} == {0.3, 0.7}
+
+
 def test_mostly_risky_condition_preset_uses_requested_priors():
     config = TrapBanditConfig(condition_preset="mostly_risky")
 
@@ -157,6 +167,26 @@ def test_trap_bandit_hypothesis_builders_construct_agents():
     ib.reset()
     assert bayes.get_probabilities().shape == (2,)
     assert ib.get_probabilities().shape == (2,)
+
+
+def test_trap_bandit_hypothesis_builder_accepts_separated_pairs():
+    _wm, safe, risky = make_trap_bandit_hypotheses(
+        p_cat=0.01,
+        p_pairs=[(0.3, 0.7), (0.7, 0.3)],
+    )
+
+    assert len(safe.measures[0].params.components) == 2
+    assert len(risky.measures[0].params.components) == 2
+    safe_pairs = {
+        tuple(component.metadata["p_values"])
+        for component in safe.measures[0].params.components
+    }
+    risky_trapped = {
+        component.metadata["trapped_arm"]
+        for component in risky.measures[0].params.components
+    }
+    assert safe_pairs == {(0.3, 0.7), (0.7, 0.3)}
+    assert risky_trapped == {0, 1}
 
 
 def test_thompson_sampling_returns_valid_policy():

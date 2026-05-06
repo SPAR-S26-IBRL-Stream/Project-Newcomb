@@ -40,6 +40,23 @@ class TrapBanditConfig:
     p_beta: tuple[float, float] = (2.0, 2.0)
     common_action_draws: bool = True
     condition_preset: str = "baseline"
+    p_mode: str = "beta"
+    p_low: float = 0.3
+    p_high: float = 0.7
+
+
+def p_pair_hypothesis_kwargs(config: TrapBanditConfig) -> dict:
+    if config.p_mode == "separated":
+        return {
+            "p_pairs": [
+                (config.p_low, config.p_high),
+                (config.p_high, config.p_low),
+            ],
+            "p_pair_weights": np.array([0.5, 0.5]),
+        }
+    if config.p_mode != "beta":
+        raise ValueError(f"unknown p_mode {config.p_mode}")
+    return {}
 
 
 def sample_action_from_uniform(probabilities: np.ndarray, draw: float) -> int:
@@ -65,6 +82,7 @@ def make_agent(
             num_grid=config.num_grid,
             p_cat=config.p_cat,
             p_beta=config.p_beta,
+            **p_pair_hypothesis_kwargs(config),
         )
     if kind == "ib":
         hypothesis = make_ib_hypothesis(safe, risky)
@@ -96,7 +114,12 @@ def sample_world(rng: np.random.Generator, config: TrapBanditConfig):
     alpha = rng.beta(*config.alpha_dgp)
     risky = bool(rng.random() < alpha)
     p_max = 1.0 - config.p_cat
-    if config.p_beta == (1.0, 1.0):
+    if config.p_mode == "separated":
+        if rng.random() < 0.5:
+            p1, p2 = config.p_low, config.p_high
+        else:
+            p1, p2 = config.p_high, config.p_low
+    elif config.p_beta == (1.0, 1.0):
         p1 = float(rng.uniform(0.0, p_max))
         p2 = float(rng.uniform(0.0, p_max))
     else:
@@ -204,6 +227,7 @@ def run_condition(
         num_grid=config.num_grid,
         p_cat=config.p_cat,
         p_beta=config.p_beta,
+        **p_pair_hypothesis_kwargs(config),
     )
 
     for world_idx in range(config.num_worlds):
@@ -344,6 +368,9 @@ def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
         "p_beta": list(config.p_beta),
         "common_action_draws": config.common_action_draws,
         "condition_preset": config.condition_preset,
+        "p_mode": config.p_mode,
+        "p_low": config.p_low,
+        "p_high": config.p_high,
         "kinds": kinds,
         "conditions": _json_conditions(get_conditions(config)),
     }
@@ -505,6 +532,14 @@ def parse_args():
         default=(2.0, 2.0),
         help="Beta parameters for the p_i DGP and matching agent grid prior.",
     )
+    parser.add_argument(
+        "--p-mode",
+        choices=["beta", "separated"],
+        default="beta",
+        help="How to generate and hypothesize arm reward probabilities.",
+    )
+    parser.add_argument("--p-low", type=float, default=0.3)
+    parser.add_argument("--p-high", type=float, default=0.7)
     parser.add_argument("--output-dir", type=Path, default=Path("experiments/alaro/trap_bandit/results"))
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--bootstrap-samples", type=int, default=0)
@@ -533,6 +568,9 @@ if __name__ == "__main__":
         p_beta=tuple(args.p_beta),
         common_action_draws=not args.independent_action_draws,
         condition_preset=args.condition_preset,
+        p_mode=args.p_mode,
+        p_low=args.p_low,
+        p_high=args.p_high,
     )
     summaries = run_and_save(
         config=cfg,
