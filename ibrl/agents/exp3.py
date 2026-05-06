@@ -1,16 +1,15 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseAgent
 from ..utils import dump_array
 
 
 class EXP3Agent(BaseAgent):
-    def __init__(self, *args,
+    def __init__(self, *,
             gamma : float = 0.1,
             max_reward : float = 1,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self.gamma = gamma
         self.max_reward = max_reward
         self.eta = gamma / self.num_actions

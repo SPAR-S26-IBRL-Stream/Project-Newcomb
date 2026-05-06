@@ -1,6 +1,7 @@
 import numpy as np
 
 from . import BaseEnvironment
+from ..outcome import Outcome
 
 
 class BernoulliBanditEnvironment(BaseEnvironment):
@@ -12,13 +13,13 @@ class BernoulliBanditEnvironment(BaseEnvironment):
     If probs are provided at construction, they are used as-is and persist across resets.
     Otherwise, probabilities are sampled uniformly from [0, 1] on each reset.
     """
-    def __init__(self, *args, probs=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, probs=None, **kwargs):
+        super().__init__(**kwargs)
         self._fixed_probs = np.array(probs, dtype=float) if probs is not None else None
 
-    def _resolve(self, env_action: int | None, action: int) -> float:
-        outcome = int(self.random.random() < self.probs[action])
-        return float(outcome)
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
+        observation = int(self.random.random() < self.probs[action])
+        return Outcome(reward=float(observation), observation=observation)
 
     def get_optimal_reward(self) -> float:
         return self.probs.max()

@@ -6,9 +6,10 @@ class Outcome:
     """Result of one round of agent-environment interaction.
 
     Attributes:
-        reward:     The scalar reward.
-        env_action: The environment's move (e.g. the predictor's prediction).
-                    None for environments with no environment move (standard bandits).
+        reward:      The scalar reward.
+        observation: The environment's discrete signal (e.g. the predictor's
+                     prediction, or a POMDP observation index). None for
+                     environments with no separate observation channel.
     """
-    reward: float
-    env_action: int | None = None
+    reward: float | None = None
+    observation: int | None = None
