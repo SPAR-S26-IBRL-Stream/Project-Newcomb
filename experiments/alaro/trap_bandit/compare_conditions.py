@@ -74,7 +74,7 @@ def plot_risky_condition_grid(
             ax_trapped.fill_between(steps, p5, p95, alpha=0.12, color=color)
 
         ax_regret.set_ylabel(CONDITION_LABELS.get(condition, condition))
-        ax_regret.set_title("Expected cumulative regret" if row == 0 else "")
+        ax_regret.set_title("Cumulative expected regret" if row == 0 else "")
         ax_trapped.set_title("Risky arm pull rate" if row == 0 else "")
         ax_trapped.set_ylim(-0.02, 1.02)
 

@@ -108,7 +108,7 @@ IB and UCB rows are not repeated across the three mostly-risky prior conditions 
 
 ![Risky-world prior comparison](results_separated_arms_200_pcat001/risky_world_prior_comparison_grid.png)
 
-Figure 3. Risky-world comparison across Bayes priors. Rows are the correctly specified and severely misspecified Bayes prior conditions; columns are expected cumulative regret and high/trapped-arm pull rate. Each row compares Infra-Bayesian, greedy Bayesian, and Thompson-sampling Bayesian agents.
+Figure 3. Risky-world comparison across Bayes priors. Rows are the correctly specified and severely misspecified Bayes prior conditions; columns are cumulative expected regret and high/trapped-arm pull rate. Each row compares Infra-Bayesian, greedy Bayesian, and Thompson-sampling Bayesian agents.
 
 The table below is the subset corresponding to Figure 3. Values are final risky-world percentiles from the plotted summary bands.
 
