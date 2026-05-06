@@ -15,8 +15,8 @@ class EXP3Agent(BaseAgent):
         self.max_reward = max_reward
         self.eta = gamma / self.num_actions
 
-    def reset(self):
-        super().reset()
+    def reset_belief(self):
+        super().reset_belief()
         # We store weights in log-space for numerical stability
         # log(1.0) = 0
         self.log_weights = np.zeros(self.num_actions)

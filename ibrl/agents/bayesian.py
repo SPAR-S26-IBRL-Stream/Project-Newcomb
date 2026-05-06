@@ -23,8 +23,8 @@ class BayesianAgent(BaseGreedyAgent):
         self.values[action] = (self.precision[action] * self.values[action] + reward) / (self.precision[action] + 1.0)
         self.precision[action] += 1
 
-    def reset(self):
-        super().reset()
+    def reset_belief(self):
+        super().reset_belief()
         self.values = np.zeros(self.num_actions)
         self.precision = np.ones(self.num_actions) * 0.1
 

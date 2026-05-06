@@ -1,5 +1,6 @@
 from .base import BaseEnvironment
 from .bandit import BanditEnvironment
+from .heavy_tailed_bandit import HeavyTailedBanditEnvironment
 from .switching import SwitchingAdversaryEnvironment
 from .base_newcomb_like import BaseNewcombLikeEnvironment
 from .newcomb import NewcombEnvironment
@@ -11,11 +12,12 @@ from .policy_dependent_bandit import PolicyDependentBanditEnvironment
 __all__ = [
     "BaseEnvironment",
     "BanditEnvironment",
+    "HeavyTailedBanditEnvironment",
     "SwitchingAdversaryEnvironment",
     "BaseNewcombLikeEnvironment",
     "NewcombEnvironment",
     "DeathInDamascusEnvironment",
     "AsymmetricDeathInDamascusEnvironment",
     "CoordinationGameEnvironment",
-    "PolicyDependentBanditEnvironment"
+    "PolicyDependentBanditEnvironment",
 ]

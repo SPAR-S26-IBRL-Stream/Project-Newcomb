@@ -32,8 +32,8 @@ class QLearningAgent(BaseGreedyAgent):
             # Q-learning
             self.q[action] += self.learning_rate * (reward - self.q[action])
 
-    def reset(self):
-        super().reset()
+    def reset_belief(self):
+        super().reset_belief()
         if self.learning_rate is None:
             self.counts = np.zeros((self.num_actions,))
         self.q = np.zeros((self.num_actions,))

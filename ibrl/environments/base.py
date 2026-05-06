@@ -54,7 +54,7 @@ class BaseEnvironment(ABC):
 
         Arguments:
             action: Action chosen by the agent
-        
+
         Returns:
             reward of the interaction
         """
@@ -72,7 +72,19 @@ class BaseEnvironment(ABC):
 
     def reset(self):
         """
-        Reset internal state. Potentially initialise randomly
+        Full reset: re-seed RNG and re-initialise persistent state.
+        Subclasses extend with state initialisation (e.g. resampling arms).
+        Used by single-episode callers.
+        """
+        self.reset_episode()
+
+    def reset_episode(self):
+        """
+        Re-seed RNG only; preserve persistent state across episodes.
+        Used by simulate_multi_episode at every episode boundary so that
+        e.g. bandit arm parameters persist while per-episode noise is fresh.
+        Default implementation handles RNG only; subclasses generally
+        do NOT need to override this.
         """
         self.seed += 1
         self.random = np.random.default_rng(seed = self.seed)

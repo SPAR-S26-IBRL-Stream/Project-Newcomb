@@ -1,5 +1,6 @@
-from .simulator import simulate
+from .simulator import simulate, simulate_multi_episode
 
 __all__ = [
-    "simulate"
+    "simulate",
+    "simulate_multi_episode",
 ]

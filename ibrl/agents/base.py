@@ -47,8 +47,26 @@ class BaseAgent(ABC):
 
     def reset(self) -> None:
         """
-        Reset internal state
-        Called before interacting with a new environment
+        Full reset: wipe learned belief AND re-seed RNG / zero step counter.
+        Used by single-episode callers.
+        """
+        self.reset_belief()
+        self.reset_episode()
+
+    def reset_belief(self) -> None:
+        """
+        Wipe learned belief state ONLY (preserve RNG / step counter).
+        Default: no-op. Subclasses with persistent belief should override.
+        Used by simulate_multi_episode when reset_agent_belief=True.
+        """
+        pass
+
+    def reset_episode(self) -> None:
+        """
+        Re-seed RNG and zero step counter ONLY (preserve learned belief).
+        Used by simulate_multi_episode at every episode boundary so the
+        agent's belief carries across episodes while per-episode RNG
+        state is fresh.
         """
         self.step = 1
         self.seed += 1
