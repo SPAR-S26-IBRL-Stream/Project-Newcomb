@@ -10,8 +10,11 @@ from ibrl.infrabayesian.builders.trap_bandit import (
 )
 from experiments.alaro.trap_bandit.run import (
     REWARD_FUNCTION,
+    TrapBanditConfig,
     bootstrap_final_regret_percentile_cis,
+    get_conditions,
     sample_action_from_uniform,
+    sample_world,
 )
 
 
@@ -67,6 +70,56 @@ def test_bootstrap_final_regret_percentile_cis_shapes():
         bootstrap["agent"]["point"],
         np.percentile([1.0, 2.0, 3.0, 4.0], [5.0, 50.0, 95.0]),
     )
+
+
+def test_uniform_p_beta_samples_valid_uniform_range():
+    rng = np.random.default_rng(123)
+    config = TrapBanditConfig(p_cat=0.05, p_beta=(1.0, 1.0))
+
+    samples = [sample_world(rng, config) for _ in range(50)]
+
+    assert all(0.0 <= sample["p1"] <= 0.95 for sample in samples)
+    assert all(0.0 <= sample["p2"] <= 0.95 for sample in samples)
+
+
+def test_mostly_risky_condition_preset_uses_requested_priors():
+    config = TrapBanditConfig(condition_preset="mostly_risky")
+
+    conditions = get_conditions(config)
+
+    assert list(conditions) == [
+        "correct",
+        "misspecified",
+        "severely_misspecified",
+        "mostly_safe_correct",
+    ]
+    assert conditions["correct"] == {"prior": (99.0, 1.0), "dgp": (99.0, 1.0)}
+    assert conditions["misspecified"] == {"prior": (1.0, 1.0), "dgp": (99.0, 1.0)}
+    assert conditions["severely_misspecified"] == {
+        "prior": (1.0, 99.0),
+        "dgp": (99.0, 1.0),
+    }
+    assert conditions["mostly_safe_correct"] == {
+        "prior": (1.0, 99.0),
+        "dgp": (1.0, 99.0),
+    }
+
+
+def test_risky_80_condition_preset_uses_requested_priors():
+    config = TrapBanditConfig(condition_preset="risky_80")
+
+    conditions = get_conditions(config)
+
+    assert conditions["correct"] == {"prior": (4.0, 1.0), "dgp": (4.0, 1.0)}
+    assert conditions["misspecified"] == {"prior": (1.0, 1.0), "dgp": (4.0, 1.0)}
+    assert conditions["severely_misspecified"] == {
+        "prior": (1.0, 4.0),
+        "dgp": (4.0, 1.0),
+    }
+    assert conditions["mostly_safe_correct"] == {
+        "prior": (1.0, 4.0),
+        "dgp": (1.0, 4.0),
+    }
 
 
 def test_ucb_tries_unpulled_actions():

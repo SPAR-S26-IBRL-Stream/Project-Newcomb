@@ -39,6 +39,7 @@ class TrapBanditConfig:
     alpha_dgp: tuple[float, float] = (2.0, 2.0)
     p_beta: tuple[float, float] = (2.0, 2.0)
     common_action_draws: bool = True
+    condition_preset: str = "baseline"
 
 
 def sample_action_from_uniform(probabilities: np.ndarray, draw: float) -> int:
@@ -94,8 +95,13 @@ def make_agent(
 def sample_world(rng: np.random.Generator, config: TrapBanditConfig):
     alpha = rng.beta(*config.alpha_dgp)
     risky = bool(rng.random() < alpha)
-    p1 = min(float(rng.beta(*config.p_beta)), 1.0 - config.p_cat)
-    p2 = min(float(rng.beta(*config.p_beta)), 1.0 - config.p_cat)
+    p_max = 1.0 - config.p_cat
+    if config.p_beta == (1.0, 1.0):
+        p1 = float(rng.uniform(0.0, p_max))
+        p2 = float(rng.uniform(0.0, p_max))
+    else:
+        p1 = min(float(rng.beta(*config.p_beta)), p_max)
+        p2 = min(float(rng.beta(*config.p_beta)), p_max)
     return {"alpha": alpha, "risky": risky, "p1": p1, "p2": p2}
 
 
@@ -289,6 +295,44 @@ def summarize_group(runs: list[dict], mask: np.ndarray) -> dict:
     }
 
 
+def get_conditions(config: TrapBanditConfig) -> dict[str, dict[str, tuple[float, float]]]:
+    if config.condition_preset == "baseline":
+        return {
+            "correct": {"prior": (2.0, 2.0), "dgp": config.alpha_dgp},
+            "misspecified": {"prior": (2.0, 5.0), "dgp": config.alpha_dgp},
+            "severely_misspecified": {"prior": (1.0, 99.0), "dgp": config.alpha_dgp},
+            "severely_pessimistic": {"prior": (99.0, 1.0), "dgp": config.alpha_dgp},
+            "mostly_safe_correct": {"prior": (1.0, 99.0), "dgp": (1.0, 99.0)},
+        }
+    if config.condition_preset == "mostly_risky":
+        return {
+            "correct": {"prior": (99.0, 1.0), "dgp": (99.0, 1.0)},
+            "misspecified": {"prior": (1.0, 1.0), "dgp": (99.0, 1.0)},
+            "severely_misspecified": {"prior": (1.0, 99.0), "dgp": (99.0, 1.0)},
+            "mostly_safe_correct": {"prior": (1.0, 99.0), "dgp": (1.0, 99.0)},
+        }
+    if config.condition_preset == "risky_80":
+        return {
+            "correct": {"prior": (4.0, 1.0), "dgp": (4.0, 1.0)},
+            "misspecified": {"prior": (1.0, 1.0), "dgp": (4.0, 1.0)},
+            "severely_misspecified": {"prior": (1.0, 4.0), "dgp": (4.0, 1.0)},
+            "mostly_safe_correct": {"prior": (1.0, 4.0), "dgp": (1.0, 4.0)},
+        }
+    raise ValueError(f"unknown condition preset {config.condition_preset}")
+
+
+def _json_conditions(
+    conditions: dict[str, dict[str, tuple[float, float]]],
+) -> dict[str, dict[str, list[float]]]:
+    return {
+        name: {
+            key: list(value)
+            for key, value in condition.items()
+        }
+        for name, condition in conditions.items()
+    }
+
+
 def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
     return {
         "num_worlds": config.num_worlds,
@@ -299,14 +343,9 @@ def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
         "alpha_dgp": list(config.alpha_dgp),
         "p_beta": list(config.p_beta),
         "common_action_draws": config.common_action_draws,
+        "condition_preset": config.condition_preset,
         "kinds": kinds,
-        "conditions": {
-            "correct": {"prior": [2.0, 2.0], "dgp": [2.0, 2.0]},
-            "misspecified": {"prior": [2.0, 5.0], "dgp": [2.0, 2.0]},
-            "severely_misspecified": {"prior": [1.0, 99.0], "dgp": [2.0, 2.0]},
-            "severely_pessimistic": {"prior": [99.0, 1.0], "dgp": [2.0, 2.0]},
-            "mostly_safe_correct": {"prior": [1.0, 99.0], "dgp": [1.0, 99.0]},
-        },
+        "conditions": _json_conditions(get_conditions(config)),
     }
 
 
@@ -382,13 +421,7 @@ def run_and_save(
     output_dir.mkdir(parents=True, exist_ok=True)
     if kinds is None:
         kinds = ["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"]
-    conditions = {
-        "correct": {"prior": (2.0, 2.0), "dgp": config.alpha_dgp},
-        "misspecified": {"prior": (2.0, 5.0), "dgp": config.alpha_dgp},
-        "severely_misspecified": {"prior": (1.0, 99.0), "dgp": config.alpha_dgp},
-        "severely_pessimistic": {"prior": (99.0, 1.0), "dgp": config.alpha_dgp},
-        "mostly_safe_correct": {"prior": (1.0, 99.0), "dgp": (1.0, 99.0)},
-    }
+    conditions = get_conditions(config)
     payload = config_payload(config, kinds)
     payload["config_hash"] = config_hash(payload)
     config_path = output_dir / "config.json"
@@ -457,6 +490,21 @@ def parse_args():
     parser.add_argument("--num-steps", type=int, default=300)
     parser.add_argument("--num-grid", type=int, default=9)
     parser.add_argument("--seed", type=int, default=123)
+    parser.add_argument("--p-cat", type=float, default=0.01)
+    parser.add_argument(
+        "--condition-preset",
+        choices=["baseline", "mostly_risky", "risky_80"],
+        default="baseline",
+        help="Condition suite to run.",
+    )
+    parser.add_argument(
+        "--p-beta",
+        nargs=2,
+        type=float,
+        metavar=("A", "B"),
+        default=(2.0, 2.0),
+        help="Beta parameters for the p_i DGP and matching agent grid prior.",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("experiments/alaro/trap_bandit/results"))
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--bootstrap-samples", type=int, default=0)
@@ -480,8 +528,11 @@ if __name__ == "__main__":
         num_worlds=args.num_worlds,
         num_steps=args.num_steps,
         num_grid=args.num_grid,
+        p_cat=args.p_cat,
         seed=args.seed,
+        p_beta=tuple(args.p_beta),
         common_action_draws=not args.independent_action_draws,
+        condition_preset=args.condition_preset,
     )
     summaries = run_and_save(
         config=cfg,
