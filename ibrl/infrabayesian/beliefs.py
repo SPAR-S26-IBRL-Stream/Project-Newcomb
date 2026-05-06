@@ -99,13 +99,25 @@ class GaussianBelief(BaseBelief):
     `noise_var` is the assumed observation noise variance, used by
     compute_outcome_probability to evaluate likelihood. Default 1.0
     matches BayesianAgent's implicit unit-variance likelihood.
+
+    `prior_mean` and `prior_precision` set the initial Normal prior over
+    each arm's mean reward. Default (0, 0.1) matches BayesianAgent. Pass
+    diverse `prior_mean` values to multiple GaussianBelief instances inside
+    an InfraBayesianAgent to create a genuinely informative KU
+    configuration (the worst-case rule then arbitrates over distinct
+    posteriors, not just (lambda, b) bookkeeping).
     """
 
-    def __init__(self, num_actions: int, noise_var: float = 1.0):
+    def __init__(self, num_actions: int,
+                 noise_var: float = 1.0,
+                 prior_mean: float = 0.0,
+                 prior_precision: float = 0.1):
         self.num_actions = num_actions
         self.noise_var = float(noise_var)
-        self.values = np.zeros(num_actions)
-        self.precision = np.ones(num_actions) * 0.1
+        self.prior_mean = float(prior_mean)
+        self.prior_precision = float(prior_precision)
+        self.values = np.full(num_actions, self.prior_mean, dtype=np.float64)
+        self.precision = np.full(num_actions, self.prior_precision, dtype=np.float64)
 
     def update(self, action: int, outcome: Outcome):
         r = outcome.reward
@@ -143,6 +155,8 @@ class GaussianBelief(BaseBelief):
         c = GaussianBelief.__new__(GaussianBelief)
         c.num_actions = self.num_actions
         c.noise_var = self.noise_var
+        c.prior_mean = self.prior_mean
+        c.prior_precision = self.prior_precision
         c.values = self.values.copy()
         c.precision = self.precision.copy()
         return c
