@@ -18,67 +18,53 @@ def newcomb_prediction(policy: np.ndarray, accuracy: float) -> np.ndarray:
 
 
 def test_newcomb_likelihood_matches_predictor_boundary_cases():
-    """Perfect and random predictors have the expected event likelihoods."""
+    """Likelihoods copy the committed policy at accuracy 1 and are uniform at 0.5."""
     wm = NewcombWorldModel()
     state = wm.initial_state()
     committed_policy = np.array([0.25, 0.75])
+    
+    cases = [
+        # perfect predictor equals committed policy
+        (1.0, committed_policy),
+        # random predictor equals random policy
+        (0.5, np.array([0.5, 0.5])),
+    ]
 
-    perfect_params = wm.make_params(predictor_accuracy=1.0)
-    random_params = wm.make_params(predictor_accuracy=0.5)
+    for accuracy, expected_prediction in cases:
+        params = wm.make_params(predictor_accuracy=accuracy)
 
-    # Perfect predictors copy the committed policy.
-    for observed_action, expected_likelihood in enumerate(committed_policy):
-        outcome = Outcome(
-            observation=observed_action,
-            reward=wm.reward_matrix[observed_action, 1],
-        )
-        np.testing.assert_array_equal(
-            wm.compute_likelihood(
-                state,
-                outcome,
-                perfect_params,
-                1,
-                committed_policy,
-            ),
-            expected_likelihood,
-        )
-
-    # Random predictors ignore the committed policy.
-    for observed_action, expected_likelihood in enumerate(np.array([0.5, 0.5])):
-        outcome = Outcome(
-            observation=observed_action,
-            reward=wm.reward_matrix[observed_action, 1],
-        )
-        np.testing.assert_array_equal(
-            wm.compute_likelihood(
-                state,
-                outcome,
-                random_params,
-                1,
-                committed_policy,
-            ),
-            expected_likelihood,
-        )
+        for observed_action in [0, 1]:
+            outcome = Outcome(
+                observation=observed_action,
+                reward=wm.reward_matrix[observed_action, 1],
+            )
+            np.testing.assert_array_equal(
+                wm.compute_likelihood(
+                    state,
+                    outcome,
+                    params,
+                    1,
+                    committed_policy,
+                ),
+                expected_prediction[observed_action],
+            )
 
 
 def test_newcomb_expected_reward_matches_prediction_table_product():
     """compute_expected_reward should implement prediction @ reward_table[:, action]."""
-    reward_table = np.array([[10., 15.], [0., 5.]])
-    wm = NewcombWorldModel(reward_table)
+    wm = NewcombWorldModel()
     state = wm.initial_state()
     params = wm.make_params(predictor_accuracy=0.7)
     policy = np.array([0.4, 0.6])
-
-    normalized_table = (
-        reward_table - reward_table.min()
-    ) / (reward_table.max() - reward_table.min())
+    reward_by_event = np.array([[2., 11.], [7., 13.]])
+    reward_function = reward_by_event.ravel()
     prediction = newcomb_prediction(policy, accuracy=0.7)
 
     for action in [0, 1]:
-        expected = prediction @ normalized_table[:, action]
+        expected = prediction @ reward_by_event[:, action]
         actual = wm.compute_expected_reward(
             state,
-            wm.agent_reward_matrix()[action],
+            reward_function,
             params,
             action,
             policy,
@@ -90,7 +76,12 @@ def test_newcomb_updates_history_only_for_pure_policies():
     """Newcomb belief history records predictor correctness only for pure policies."""
     wm = NewcombWorldModel()
     state = wm.initial_state()
-
+    
+    # The Newcomb belief state keeps a two-bin history: count predictor was [wrong, right]
+    # To start, zero counts of either
+    np.testing.assert_array_equal(state.history, np.array([0, 0]))
+   
+    # Predictor was right
     state = wm.update_state(
         state,
         Outcome(observation=0, reward=wm.reward_matrix[0, 0]),
@@ -99,6 +90,7 @@ def test_newcomb_updates_history_only_for_pure_policies():
     )
     np.testing.assert_array_equal(state.history, np.array([0, 1]))
 
+    # Predictor was wrong
     state = wm.update_state(
         state,
         Outcome(observation=1, reward=wm.reward_matrix[1, 0]),
@@ -107,6 +99,7 @@ def test_newcomb_updates_history_only_for_pure_policies():
     )
     np.testing.assert_array_equal(state.history, np.array([1, 1]))
 
+    # Don't update for mixed policies
     state = wm.update_state(
         state,
         Outcome(observation=0, reward=wm.reward_matrix[0, 0]),
