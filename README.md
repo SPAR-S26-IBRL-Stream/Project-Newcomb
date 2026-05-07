@@ -8,7 +8,7 @@ Full design spec: [Architecture Planning Document](https://docs.google.com/docum
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
 
-    git clone https://github.com/Lorxus/Project-Newcomb.git
+    git clone <repo-url>
     cd Project-Newcomb
     uv sync
 
@@ -152,6 +152,4 @@ uv run pytest --cov=ibrl --cov-report=html
 uv run pytest --cov=ibrl --cov-report=term-missing
 
 ```
-
-or just push a commit and check github https://github.com/SPAR-S26-IBRL-Stream/Project-Newcomb/actions in a minute
 
