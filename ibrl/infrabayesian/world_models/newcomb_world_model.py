@@ -28,6 +28,11 @@ class NewcombWorldModelBeliefState:
     Belief state of Newcomb world model: Histogram of previous observations
         history[0]  Number of times predictor was wrong
         history[1]  Number of times predictor was right
+
+    This compact right/wrong history is only a sufficient statistic for pure
+    policies. For mixed policies, the infradistribution update still applies
+    the immediate observation likelihood to each a-measure's scale, but this
+    persistent predictor-accuracy history is left unchanged.
     """
     history : np.ndarray  # integer array shape (2,)
 
@@ -97,13 +102,10 @@ class NewcombWorldModel(WorldModel):
             action : int,
             policy : np.ndarray):
         new_state = NewcombWorldModelBeliefState(state.history.copy())
-        if np.isclose(policy[action], 1):  # Update only on pure strategies
-            # Updating on mixed strategies would be more complicated, as the
-            # amount of information gained depends on the policy, e.g. uniform
-            # policy -> no information gain because perfect and random
-            # predictor behave identical.
-            # Also, even a random predictor will be correct sometimes. This is
-            # currently not taken into account.
+        if np.isclose(policy[action], 1):
+            # The right/wrong history only supports predictor-accuracy learning
+            # for pure policies. Mixed-policy learning would require storing
+            # policy-conditioned likelihood evidence instead of binary counts.
             new_state.history[int(outcome.observation == action)] += 1
         return new_state
 
