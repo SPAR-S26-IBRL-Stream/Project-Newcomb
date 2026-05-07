@@ -1,15 +1,16 @@
-"""Behavioral anchors for the Bernoulli WorldModel-based IB refactor."""
+"""Phase 1 behavioral anchors for the WorldModel-based infrabayesian refactor."""
 import numpy as np
+import pytest
 
-from ibrl.infrabayesian import MultiBernoulliWorldModel
 from ibrl.infrabayesian.a_measure import AMeasure
 from ibrl.infrabayesian.infradistribution import Infradistribution
+from ibrl.infrabayesian import MultiBernoulliWorldModel
 from ibrl.outcome import Outcome
 
 NUM_ARMS = 1
 ARM = 0
 
-REWARD = np.array([0., 1.])
+REWARD = np.array([0., 1.])  # outcome 0 → reward 0, outcome 1 → reward 1
 
 
 def make_dist(num_hypotheses: int = 5) -> Infradistribution:
@@ -29,7 +30,7 @@ def obs(reward: float) -> Outcome:
     return Outcome(reward=reward)
 
 
-# Normalization conditions
+# ── Normalization conditions ────────────────────────────────────────────────
 
 def test_e_h_zero_is_zero():
     """E_H([0, 0]) == 0 at initialization."""
@@ -52,7 +53,7 @@ def test_evaluate_action_in_unit_interval():
     assert 0. <= v <= 1.
 
 
-# Learning direction
+# ── Learning direction ──────────────────────────────────────────────────────
 
 def test_update_increases_evaluate_action_after_rewards():
     dist = make_dist()
@@ -74,7 +75,7 @@ def test_update_decreases_evaluate_action_after_no_rewards():
     assert dist.evaluate_action(REWARD, ARM, None) < ev_before
 
 
-# Scale and offset invariants
+# ── Scale and offset invariants ─────────────────────────────────────────────
 
 def test_scale_and_offset_nonnegative():
     dist = make_dist()
@@ -96,45 +97,35 @@ def test_pure_measure_evaluate_action():
     assert abs(dist.evaluate_action(REWARD, ARM, None) - 0.7) < 1e-6
 
 
-# Mix variants
+# ── Mix variants ────────────────────────────────────────────────────────────
 
 def test_mix_bayesian_average():
     """Classical Bayesian mix of two hypotheses gives their weighted average."""
     wm = MultiBernoulliWorldModel(num_arms=NUM_ARMS)
-    d_low = Infradistribution(
-        [AMeasure(wm.make_params([np.array([0.8, 0.2])]))],
-        world_model=wm,
-    )
-    d_high = Infradistribution(
-        [AMeasure(wm.make_params([np.array([0.2, 0.8])]))],
-        world_model=wm,
-    )
+    d_low  = Infradistribution([AMeasure(wm.make_params([np.array([0.8, 0.2])]))], world_model=wm)
+    d_high = Infradistribution([AMeasure(wm.make_params([np.array([0.2, 0.8])]))], world_model=wm)
     dist = Infradistribution.mix([d_low, d_high], np.array([0.5, 0.5]))
+    # Both arms equal weight → average expected reward = 0.5 * 0.2 + 0.5 * 0.8 = 0.5
     assert abs(dist.evaluate_action(REWARD, ARM, None) - 0.5) < 1e-6
 
 
 def test_mixku_pessimistic():
     """KU mixture takes the pessimistic (min) expected reward."""
     wm = MultiBernoulliWorldModel(num_arms=NUM_ARMS)
-    d_low = Infradistribution(
-        [AMeasure(wm.make_params([np.array([0.8, 0.2])]))],
-        world_model=wm,
-    )
-    d_high = Infradistribution(
-        [AMeasure(wm.make_params([np.array([0.2, 0.8])]))],
-        world_model=wm,
-    )
+    d_low  = Infradistribution([AMeasure(wm.make_params([np.array([0.8, 0.2])]))], world_model=wm)
+    d_high = Infradistribution([AMeasure(wm.make_params([np.array([0.2, 0.8])]))], world_model=wm)
     dist = Infradistribution.mixKU([d_low, d_high])
+    # Pessimistic: min(0.2, 0.8) = 0.2
     assert abs(dist.evaluate_action(REWARD, ARM, None) - 0.2) < 1e-6
 
 
-# DiscreteBayesianAgent equivalence
+# ── DiscreteBayesianAgent equivalence ──────────────────────────────────────
 
 def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     """
     An IB agent built with a uniform grid of Bernoulli hypotheses should choose
     the same arm as DiscreteBayesianAgent at every step. The raw expected values
-    differ by a global scale factor from IB normalization, but argmax is
+    differ by a global scale factor (from the IB normalization), but argmax is
     preserved because the scale is the same across all arms.
     """
     from ibrl.agents.discrete_bayesian import DiscreteBayesianAgent
@@ -148,19 +139,10 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     params = wm.make_params([grid] * n)
     hypotheses = [Infradistribution([AMeasure(params)], world_model=wm)]
 
-    db = DiscreteBayesianAgent(
-        num_actions=n,
-        num_hypotheses=num_hypotheses,
-        epsilon=0.0,
-        seed=0,
-    )
-    ib = InfraBayesianAgent(
-        num_actions=n,
-        hypotheses=hypotheses,
-        prior=np.array([1.0]),
-        epsilon=0.0,
-        seed=0,
-    )
+    db = DiscreteBayesianAgent(num_actions=n, num_hypotheses=num_hypotheses,
+                               epsilon=0.0, seed=0)
+    ib = InfraBayesianAgent(num_actions=n, hypotheses=hypotheses,
+                            prior=np.array([1.0]), epsilon=0.0, seed=0)
     db.reset()
     ib.reset()
 
@@ -168,12 +150,14 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     for step in range(40):
         db_policy = db.get_probabilities()
         ib_policy = ib.get_probabilities()
-
+        
+        # assert arm ordering is the same for both agents
         assert np.array_equal(np.argsort(db_policy), np.argsort(ib_policy)), (
             f"Step {step}: DB={db_policy}, IB={ib_policy}"
         )
 
         action = int(rng.integers(n))
+        # hardcode first arm is the best
         reward = float(rng.random() < (0.7 if action == 0 else 0.3))
         outcome = Outcome(reward=reward)
 
