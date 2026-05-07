@@ -1,8 +1,6 @@
 # Project-Newcomb
 
-Proof-of-concept infrabayesian reinforcement learning (IBRL) agent that converges to optimal policies on Newcomb-like problems and other decision-theoretically complex environments. SPAR Spring 2026 project.
-
-Full design spec: [Architecture Planning Document](https://docs.google.com/document/d/1WkUK5Mc_OsfeaE6wUbuEhdzCXzDbq6pAapHp1LOLCMk)
+Proof-of-concept infrabayesian reinforcement learning (IBRL) agent that converges to optimal policies on Newcomb-like problems and other decision-theoretically complex environments.
 
 ## Setup
 
@@ -41,12 +39,7 @@ Anyone can contribute new agents and environments! To do so, please:
 
 ### Experiments
 
-**experiments/** is the exploration zone. Create a folder with your git handle. Each experiment gets its own subfolder with a README covering: what and why, design decisions, chat logs if vibe coded, results and interpretation, ideas for shared architecture evolution. PRs here get lighter review.
-
-Some example work flows you can copy for your experiments:
-- Using a main.py file in experiments/fllor/main.py
-- Using a jupyter notebook in experiments/alaro/example.ipynb
-
+**experiments/** is the exploration zone. Each experiment gets its own subfolder with a README covering: what and why, design decisions, chat logs if vibe coded, results and interpretation, ideas for shared architecture evolution. PRs here get lighter review.
 
 ## Running scripts
 
