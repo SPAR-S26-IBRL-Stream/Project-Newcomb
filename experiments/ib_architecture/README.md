@@ -47,7 +47,7 @@ When operating without KU, the IB agent differs from the discrete Bayesian in th
 3. The mixed infradistribution replaces the classical `prior`. Just like the classical agent had one prior for each action, the IB agent has one infradistribution for each action. These infradistributions are completely independent of each other. Learning happens by updating the infradistribution of the selected action. The IB update rule replaces the classical update rule.
 4. When making a decision, the agent computes the infra-expected value of each action and takes the action that maximises it. Like the classical agent, it uses an ε-greedy policy to encourage exploration.
 
-It was validated that the IB agent exactly reproduces the classical agent, when initialised in this way. See `experiments/fllor2/ib_validate_classical.ipynb` for details.
+It was validated that the IB agent exactly reproduces the classical agent, when initialised in this way. See `experiments/ib_architecture/ib_validate_classical.ipynb` for details.
 
 Before turning to the true IB behaviour, it is helpful to explain the implementation of the mathematical objects.
 
@@ -134,7 +134,7 @@ Infradistribution.mixKU([
 ])
 ```
 
-We see that we can combine classical priors and KU in arbitrary ways. Some combinations of infradistributions can be expressed in different ways. For example, we have `prior(m1, KU(m2,m3)) = KU(prior(m1,m2), prior(m1,m3))`, where `prior(a,b)` and `KU(a,b)` are the infradistributions that result from mixing `a` and `b` according to some classical prior or KU respectively. More examples are given in `experiments/fllor2/ib_mixtures.ipynb`.
+We see that we can combine classical priors and KU in arbitrary ways. Some combinations of infradistributions can be expressed in different ways. For example, we have `prior(m1, KU(m2,m3)) = KU(prior(m1,m2), prior(m1,m3))`, where `prior(a,b)` and `KU(a,b)` are the infradistributions that result from mixing `a` and `b` according to some classical prior or KU respectively. More examples are given in `experiments/ib_architecture/ib_mixtures.ipynb`.
 
 
 ## TODO / Questions
