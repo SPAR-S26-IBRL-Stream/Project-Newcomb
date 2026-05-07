@@ -5,6 +5,7 @@ from ibrl.infrabayesian import NewcombWorldModel
 from ibrl.infrabayesian.a_measure import AMeasure
 from ibrl.infrabayesian.infradistribution import Infradistribution
 from ibrl.outcome import Outcome
+from ibrl.agents import InfraBayesianAgent
 
 
 def newcomb_prediction(policy: np.ndarray, accuracy: float) -> np.ndarray:
@@ -122,8 +123,7 @@ def test_newcomb_agent_policy_maximizes_discretized_table_value(
     reward_table: np.ndarray,
     accuracy: float,
 ):
-    """Convert the notebook's validation plot into a deterministic policy test."""
-    from ibrl.agents import InfraBayesianAgent
+    """Check that the agent chooses the max-value policy from its discretized policy grid."""
 
     wm = NewcombWorldModel(reward_table)
     dist = Infradistribution([AMeasure(wm.make_params(accuracy))], wm)
