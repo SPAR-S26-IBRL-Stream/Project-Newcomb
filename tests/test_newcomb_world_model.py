@@ -73,6 +73,25 @@ def test_newcomb_expected_reward_matches_prediction_table_product():
         np.testing.assert_array_equal(actual, expected)
 
 
+def test_newcomb_likelihood_uses_action_when_rewards_are_repeated():
+    """Repeated rewards are valid because observation and selected action define the event."""
+    reward_table = np.array([[0., 0.], [1., 2.]])
+    wm = NewcombWorldModel(reward_table)
+    state = wm.initial_state()
+    params = wm.make_params(predictor_accuracy=0.8)
+    policy = np.array([0.25, 0.75])
+
+    outcome = Outcome(observation=0, reward=reward_table[0, 1])
+
+    assert wm.compute_likelihood(
+        state,
+        outcome,
+        params,
+        action=1,
+        policy=policy,
+    ) == pytest.approx(newcomb_prediction(policy, accuracy=0.8)[0])
+
+
 def test_newcomb_updates_history_only_for_pure_policies():
     """Newcomb belief history records predictor correctness only for pure policies."""
     wm = NewcombWorldModel()

@@ -28,6 +28,11 @@ class NewcombWorldModelBeliefState:
     Belief state of Newcomb world model: Histogram of previous observations
         history[0]  Number of times predictor was wrong
         history[1]  Number of times predictor was right
+
+    This compact right/wrong history is only a sufficient statistic for pure
+    policies. For mixed policies, the infradistribution update still applies
+    the immediate observation likelihood to each a-measure's scale, but this
+    persistent predictor-accuracy history is left unchanged.
     """
     history : np.ndarray  # integer array shape (2,)
 
@@ -76,17 +81,17 @@ class NewcombWorldModel(WorldModel):
         mixed_coefficients /= mixed_coefficients.sum()  # For numerics
         return NewcombWorldModelParameters(coefficients=mixed_coefficients, log_accuracy=log_accuracy)
 
-    def event_index(self, outcome: Outcome) -> int:
-        indices = []
-        i = outcome.observation            # predicted action
-        for j in range(self.num_actions):  # selected action
-            if np.isclose(outcome.reward, self.reward_matrix[i,j]):
-                indices.append(i*self.num_actions + j)
-        if len(indices) == 0:
+    def event_index(self, outcome: Outcome, action: int) -> int:
+        i = outcome.observation
+        j = action
+        if i is None or not (0 <= i < self.num_actions):
             raise RuntimeError(f"Invalid outcome in Newcomb environment: {outcome}")
-        if len(indices) > 1:
-            raise RuntimeError(f"Ambiguous outcome in Newcomb environment: {outcome}")
-        return indices[0]
+        if not (0 <= j < self.num_actions):
+            raise RuntimeError(f"Invalid action in Newcomb environment: {action}")
+        if not np.isclose(outcome.reward, self.reward_matrix[i,j]):
+            raise RuntimeError(f"Invalid outcome in Newcomb environment: {outcome}")
+        # Events are indexed by flattening the (prediction, action) table row-major.
+        return i*self.num_actions + j
 
     def initial_state(self):
         return NewcombWorldModelBeliefState(history=np.zeros(2, dtype=np.int64))
@@ -97,13 +102,10 @@ class NewcombWorldModel(WorldModel):
             action : int,
             policy : np.ndarray):
         new_state = NewcombWorldModelBeliefState(state.history.copy())
-        if np.isclose(policy[action], 1):  # Update only on pure strategies
-            # Updating on mixed strategies would be more complicated, as the
-            # amount of information gained depends on the policy, e.g. uniform
-            # policy -> no information gain because perfect and random
-            # predictor behave identical.
-            # Also, even a random predictor will be correct sometimes. This is
-            # currently not taken into account.
+        if np.isclose(policy[action], 1):
+            # The right/wrong history only supports predictor-accuracy learning
+            # for pure policies. Mixed-policy learning would require storing
+            # policy-conditioned likelihood evidence instead of binary counts.
             new_state.history[int(outcome.observation == action)] += 1
         return new_state
 
@@ -119,7 +121,7 @@ class NewcombWorldModel(WorldModel):
         P(outcome | belief_state, params, action) under this hypothesis.
         Returns a scalar in [0, 1].
         """
-        event = self.event_index(outcome)
+        event = self.event_index(outcome, action)
 
         # i: predicted action
         # j: selected action
