@@ -6,7 +6,7 @@ This directory contains the infrastructure to run many different environment/age
 ## Instructions
 To run this experiment, execute
 ```bash
-make -f experiments/fllor/Makefile [-j N]
+make -f experiments/agent_comparison_sweep/Makefile [-j N]
 ```
 from the project root directory. Ideally use multiple cores, as the runs take a while to complete.
 

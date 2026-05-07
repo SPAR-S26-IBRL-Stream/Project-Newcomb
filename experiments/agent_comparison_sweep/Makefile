@@ -41,7 +41,7 @@ NUM_PLOTS=6
 all:
 .PHONY: all
 
-BASE_DIR=experiments/fllor
+BASE_DIR=experiments/agent_comparison_sweep
 OUTPUT_DIR=$(BASE_DIR)/outputs
 PLOT_DIR=$(BASE_DIR)/figures
 
