@@ -3,11 +3,8 @@
 This is an explanation of the updated IB agent architecture.
 
 ## Motivation
-Some issues with the current implementation are explained in this document (discussed in the group meeting on April 6th):
-
-https://docs.google.com/document/d/1uWw0lb2lXMwLBy7XyCC5d7pFaN-qolcE6VKVaF5Urek/edit?tab=t.0
-
-In particular, it motivates that the IB agent architecture should be:
+Some issues with a prior implementation motivate the architecture below.
+In particular, the IB agent architecture should be:
 
 - A classical prior (probability distribution)
 - Over hypotheses (infradistributions), each of which describes one or more
