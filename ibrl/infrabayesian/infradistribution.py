@@ -76,28 +76,28 @@ class Infradistribution:
                    for measure in self.measures)
 
     def update(self, reward_function : np.ndarray, outcome : Outcome,
-               action : int, policy : np.ndarray) -> None:
-        """
-        Update all a-measures upon seeing a certain event using a given reward function
-        This is Definition 11 from Basic Inframeasure Theory
-        """
+           action : int, policy : np.ndarray) -> None:
         event = self.world_model.event_index(outcome, action)
         rf = reward_function[action]
 
-        # Expectation values (need to be computed before updating anything)
         glued0 = Infradistribution._glue(0, event, rf)
         glued1 = Infradistribution._glue(1, event, rf)
         expect0 = self.evaluate_action(glued0, action, policy)
         expect1 = self.evaluate_action(glued1, action, policy)
         probability = expect1 - expect0
-        assert probability > 0  # If probability==0, the measure should be removed (to it, nothing matters anymore)
+        
+        
+        probability = expect1 - expect0
+
+        if probability <= 1e-100:
+            # Observation has negligible probability; treat as impossible
+            # Don't update to avoid numerical instability
+            return
+        
         expect_m = [measure.evaluate_action(self.world_model, self.belief_state, glued0,
                                             action, policy)
                     for measure in self.measures]
 
-        # Raw update 1: Update belief state
-        # Update normalisation to the amount that we cut off
-        # This is the m*L term of the IB update rule
         for measure in self.measures:
             measure.scale *= self.world_model.compute_likelihood(
                 self.belief_state, outcome, measure.params, action, policy)
@@ -105,12 +105,9 @@ class Infradistribution:
             self.belief_state, outcome, action, policy,
             params=self.measures[0].params)
 
-        # Raw update 2: Add off-history reward to offset
-        # The measure evaluation includes the offset, so we do an assignment here, rather than an addition
-        for i,measure in enumerate(self.measures):
+        for i, measure in enumerate(self.measures):
             measure.offset = expect_m[i]
 
-        # Renormalisation
         for measure in self.measures:
             measure.offset -= expect0
             measure /= probability

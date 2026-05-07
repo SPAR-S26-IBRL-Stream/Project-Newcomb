@@ -22,4 +22,9 @@ __all__ = [
     "ExperimentalAgent2",
     "ExperimentalAgent3",
     "InfraBayesianAgent",
+    "SupraPOMDPAgent",  # NEW
 ]
+
+
+
+

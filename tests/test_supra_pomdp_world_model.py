@@ -12,6 +12,7 @@ import pytest
 from ibrl.infrabayesian.world_models.supra_pomdp_world_model import (
     SupraPOMDPWorldModel, SupraPOMDPWorldModelBeliefState
 )
+from ibrl.agents.supra_pomdp_agent import BeliefPolicy
 from ibrl.outcome import Outcome
 
 
@@ -31,6 +32,13 @@ def _identity_pomdp(num_states=2, num_actions=1):
 
 def obs(o: int, reward: float = 0.) -> Outcome:
     return Outcome(reward=reward, observation=o)
+
+
+def flat_belief_policy(action_dist, num_states=2) -> BeliefPolicy:
+    return BeliefPolicy(
+        belief_points=np.ones((1, num_states)) / num_states,
+        policy_table=np.array([action_dist], dtype=float),
+    )
 
 
 # ── §3.1  Param construction and validation ───────────────────────────────────
@@ -498,21 +506,23 @@ def test_compute_q_values_credal_mixture_averages_by_posterior():
 # ── §3.8  Policy-dependent kernels ────────────────────────────────────────────
 
 def test_make_params_accepts_callable_theta_0():
-    """θ₀ as callable π → array of shape (|S|,) is accepted."""
+    """theta_0 callable receives a full BeliefPolicy object."""
     wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
     T = np.array([[[0.9, 0.1], [0.5, 0.5]],
                    [[0.5, 0.5], [0.1, 0.9]]])
     B = np.eye(2)
-    theta_0_fn = lambda pi: np.array([pi[0], pi[1]])
+    theta_0_fn = lambda policy: policy.policy_table[0]
     R = np.zeros((2, 2, 2))
     wm.make_params(T, B, theta_0_fn, R)  # must not raise
 
 
 def test_make_params_accepts_callable_T():
-    """T as callable π → array of shape (|S|, |A|, |S|) is accepted."""
+    """T callable receives a full BeliefPolicy object."""
     wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
-    T_fn = lambda pi: np.array([[[pi[0], pi[1]], [0.5, 0.5]],
-                                  [[0.5, 0.5], [pi[0], pi[1]]]])
+    T_fn = lambda policy: np.array([
+        [[policy.policy_table[0, 0], policy.policy_table[0, 1]], [0.5, 0.5]],
+        [[0.5, 0.5], [policy.policy_table[0, 0], policy.policy_table[0, 1]]],
+    ])
     B = np.eye(2)
     theta_0 = np.array([0.5, 0.5])
     R = np.zeros((2, 2, 2))
@@ -520,42 +530,48 @@ def test_make_params_accepts_callable_T():
 
 
 def test_make_params_rejects_callable_theta_0_with_wrong_output_shape():
-    """Callable that returns wrong shape on uniform policy must fail at make_params."""
+    """Callable that returns wrong shape under default policy must fail at make_params."""
     wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
     T = np.array([[[0.9, 0.1], [0.5, 0.5]],
                    [[0.5, 0.5], [0.1, 0.9]]])
-    bad_theta_fn = lambda pi: np.array([0.5, 0.3, 0.2])  # shape (3,), not (2,)
+    bad_theta_fn = lambda policy: np.array([0.5, 0.3, 0.2])  # shape (3,), not (2,)
     with pytest.raises(AssertionError):
         wm.make_params(T, np.eye(2), bad_theta_fn, np.zeros((2, 2, 2)))
 
 
 def test_initial_belief_uses_callable_theta_0_with_policy():
-    """For callable θ₀, _initial_belief resolves it against the given policy."""
+    """For callable theta_0, _initial_belief resolves it against BeliefPolicy."""
     wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
     T = np.array([[[0.9, 0.1], [0.5, 0.5]],
                    [[0.5, 0.5], [0.1, 0.9]]])
     B = np.eye(2)
-    theta_0_fn = lambda pi: np.array([pi[0], 1. - pi[0]])
+    theta_0_fn = lambda policy: np.array([
+        policy.policy_table[0, 0],
+        1. - policy.policy_table[0, 0],
+    ])
     R = np.zeros((2, 2, 2))
     params = wm.make_params(T, B, theta_0_fn, R)
 
-    policy = np.array([0.8, 0.2])
+    policy = flat_belief_policy([0.8, 0.2])
     belief = wm._initial_belief(params, policy=policy).components[0][0]
     np.testing.assert_allclose(belief, [0.8, 0.2])
 
 
 def test_update_state_uses_callable_theta_0_on_lazy_init():
-    """First update_state from None with callable θ₀ uses supplied policy."""
+    """First update_state from None with callable theta_0 uses supplied BeliefPolicy."""
     wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
     T = np.array([[[0.9, 0.1], [0.5, 0.5]],
                    [[0.5, 0.5], [0.1, 0.9]]])
     B = np.eye(2)
-    theta_0_fn = lambda pi: np.array([pi[0], 1. - pi[0]])  # θ₀ = policy
+    theta_0_fn = lambda policy: np.array([
+        policy.policy_table[0, 0],
+        1. - policy.policy_table[0, 0],
+    ])
     R = np.zeros((2, 2, 2))
     params = wm.make_params(T, B, theta_0_fn, R)
 
-    policy = np.array([0.9, 0.1])
-    # With B=identity and policy=[0.9,0.1], θ₀=[0.9,0.1]
+    policy = flat_belief_policy([0.9, 0.1])
+    # With B=identity and policy row [0.9,0.1], theta_0=[0.9,0.1]
     # obs=0: only state 0 consistent → belief=[1,0]
     state = wm.update_state(wm.initial_state(), obs(0), action=0, policy=policy, params=params)
     belief, _ = state.components[0]
@@ -563,78 +579,89 @@ def test_update_state_uses_callable_theta_0_on_lazy_init():
 
 
 def test_update_state_uses_callable_T_each_step():
-    """Callable T(π) is evaluated with the current policy at each step."""
-    wm = SupraPOMDPWorldModel(num_states=2, num_actions=1, num_obs=2)
-    # T depends on policy: high π[0] → stay in current state; low → swap
-    def T_fn(pi):
-        stay = pi[0]
-        swap = 1. - pi[0]
-        return np.array([[[stay, swap]], [[swap, stay]]])
+    """Callable T is evaluated with the committed BeliefPolicy at each step."""
+    wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
+
+    def T_fn(policy):
+        stay = policy.policy_table[0, 0]
+        swap = 1. - stay
+        return np.array([
+            [[stay, swap], [0.5, 0.5]],
+            [[swap, stay], [0.5, 0.5]],
+        ])
 
     B = np.eye(2)
     theta_0 = np.array([1., 0.])  # start in state 0
-    R = np.zeros((2, 1, 2))
+    R = np.zeros((2, 2, 2))
     params = wm.make_params(T_fn, B, theta_0, R)
 
-    # policy π=[1,0]: T keeps state 0 → after a=0, still in s=0 → obs=0 certain
-    policy_stay = np.array([1.0])
+    # action-0-heavy policy: T keeps state 0 → after a=0, obs=0 certain
+    policy_stay = flat_belief_policy([1.0, 0.0])
     state_stay = wm.update_state(wm.initial_state(), obs(0), action=0, policy=policy_stay, params=params)
     belief_stay, _ = state_stay.components[0]
     np.testing.assert_allclose(belief_stay, [1., 0.], atol=1e-9)
 
-    # policy π=[0,1] (represented as scalar 0): T swaps → s=0 → s=1 → obs=0 impossible
-    policy_swap = np.array([0.0])
+    # action-1-heavy policy: T swaps under action 0 → obs=0 impossible
+    policy_swap = flat_belief_policy([0.0, 1.0])
     state_swap = wm.update_state(wm.initial_state(), obs(0), action=0, policy=policy_swap, params=params)
     _, log_m_swap = state_swap.components[0]
     assert log_m_swap < -100  # obs=0 was impossible
 
 
 def test_compute_likelihood_uses_callable_T():
-    """compute_likelihood with callable T resolves kernels against the policy."""
-    wm = SupraPOMDPWorldModel(num_states=2, num_actions=1, num_obs=2)
-    # T(pi): if pi[0]=1.0, stay; if pi[0]=0.0, swap states
-    def T_fn(pi):
-        stay = pi[0]; swap = 1. - pi[0]
-        return np.array([[[stay, swap]], [[swap, stay]]])
+    """compute_likelihood resolves callable T against the committed BeliefPolicy."""
+    wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
+
+    def T_fn(policy):
+        stay = policy.policy_table[0, 0]
+        swap = 1. - stay
+        return np.array([
+            [[stay, swap], [0.5, 0.5]],
+            [[swap, stay], [0.5, 0.5]],
+        ])
 
     B = np.eye(2)
     theta_0 = np.array([1., 0.])
-    R = np.zeros((2, 1, 2))
+    R = np.zeros((2, 2, 2))
     params = wm.make_params(T_fn, B, theta_0, R)
 
     # policy that stays in state 0 → P(obs=0) should be 1
     lik_stay = wm.compute_likelihood(wm.initial_state(), obs(0), params, action=0,
-                                     policy=np.array([1.0]))
+                                     policy=flat_belief_policy([1.0, 0.0]))
     assert np.isclose(lik_stay, 1.0, atol=1e-9)
 
     # policy that swaps to state 1 → P(obs=0) should be 0
     lik_swap = wm.compute_likelihood(wm.initial_state(), obs(0), params, action=0,
-                                     policy=np.array([0.0]))
+                                     policy=flat_belief_policy([0.0, 1.0]))
     assert lik_swap < 1e-9
 
 
 def test_value_iteration_cache_invalidates_on_policy_change_with_callable_T():
-    """Different policies with callable T must produce different V; cache must hit on repeat."""
-    wm = SupraPOMDPWorldModel(num_states=2, num_actions=1, num_obs=2, discount=0.9)
+    """Different BeliefPolicy objects must produce different cache keys."""
+    wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2, discount=0.9)
 
-    def T_fn(pi):
-        stay = pi[0]; swap = 1. - pi[0]
-        return np.array([[[stay, swap]], [[swap, stay]]])
+    def T_fn(policy):
+        stay = policy.policy_table[0, 0]
+        swap = 1. - stay
+        return np.array([
+            [[stay, swap], [0.5, 0.5]],
+            [[swap, stay], [0.5, 0.5]],
+        ])
 
     B = np.eye(2)
     theta_0 = np.array([1., 0.])
-    R = np.zeros((2, 1, 2))
+    R = np.zeros((2, 2, 2))
     R[0, 0, 0] = 1.  # reward only in state 0
     params = wm.make_params(T_fn, B, theta_0, R)
 
-    policy_stay = np.array([1.0])
-    policy_swap = np.array([0.0])
+    policy_stay = flat_belief_policy([1.0, 0.0])
+    policy_swap = flat_belief_policy([0.0, 1.0])
 
     T_stay = T_fn(policy_stay)
     T_swap = T_fn(policy_swap)
 
-    key_stay = (id(params), policy_stay.tobytes())
-    key_swap = (id(params), policy_swap.tobytes())
+    key_stay = (id(params), policy_stay.cache_key())
+    key_swap = (id(params), policy_swap.cache_key())
 
     V_stay = wm._value_iteration(T_stay, R, policy_stay, cache_key=key_stay)
     V_swap = wm._value_iteration(T_swap, R, policy_swap, cache_key=key_swap)
@@ -653,10 +680,9 @@ def test_transparent_newcomb_epsilon_one_step_likelihood():
     wm = SupraPOMDPWorldModel(num_states=2, num_actions=2, num_obs=2)
     # States: 0=predicted_one_box, 1=predicted_two_box
     # Observations: 0=box_full, 1=box_empty
-    # θ₀(π): predictor predicts with ε error
-    # one-box policy: π[0]=1.0 → should be predicted as one-boxer with prob 1-ε
-    def theta_0_fn(pi):
-        p_one_box = (1 - eps) * pi[0] + eps * 0.5
+    # theta_0(policy): predictor sees the committed BeliefPolicy table.
+    def theta_0_fn(policy):
+        p_one_box = (1 - eps) * policy.policy_table[0, 0] + eps * 0.5
         return np.array([p_one_box, 1. - p_one_box])
 
     T = np.zeros((2, 2, 2))
@@ -666,7 +692,7 @@ def test_transparent_newcomb_epsilon_one_step_likelihood():
     R = np.zeros((2, 2, 2))
     params = wm.make_params(T, B, theta_0_fn, R)
 
-    one_box_policy = np.array([1.0, 0.0])
+    one_box_policy = flat_belief_policy([1.0, 0.0])
     # P(obs=box_full | one-box policy) should be ≈ (1-ε)*1 + ε*0.5*1
     lik = wm.compute_likelihood(wm.initial_state(), obs(0), params, action=0,
                                 policy=one_box_policy)
