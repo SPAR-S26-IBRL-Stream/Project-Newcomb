@@ -102,3 +102,56 @@ Use infra: for non-code changes like README, CI, pyproject.toml and repo config.
 - Save your config alongside your results
 - If you vibe code, review the output for correctness and adherence to spec
 - Don't commit large data files (results/ is gitignored)
+
+
+
+
+
+
+
+
+## Fork update:
+
+Minimal & focused - Only tests core agents/environments, skips experimental code
+Fast smoke test - 10-second validation catches obvious breakage
+Structured fixtures - Reusable test setup
+CI/CD ready - GitHub Actions workflow for PR validation
+Coverage tracking - Optional coverage reports
+Timeout protection - Prevents hanging tests
+
+## Test manual
+
+In BRIEF
+```
+uv sync --extra test
+uv run pytest --cov=ibrl --cov-report=term-missing
+```
+
+
+
+```
+# Install test dependencies
+uv sync --extra test
+
+# Run all tests
+uv run pytest
+
+# Run only smoke tests (fast)
+uv run pytest tests/test_smoke.py -v
+
+# Run specific test file
+uv run pytest tests/test_agents.py -v
+uv run pytest tests/test_environments.py -v
+uv run pytest tests/test_simulator.py -v
+uv run pytest tests/test_construction.py -v
+
+
+# Run and see the coverage report
+
+uv run pytest --cov=ibrl --cov-report=html
+uv run pytest --cov=ibrl --cov-report=term-missing
+
+```
+
+or just push a commit and check github https://github.com/SPAR-S26-IBRL-Stream/Project-Newcomb/actions in a minute
+

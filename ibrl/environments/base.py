@@ -62,8 +62,9 @@ class BaseEnvironment(ABC):
         return None
 
     @abstractmethod
-    def _resolve(self, env_action : int | None, action : int) -> float:
-        """Determine the reward given both moves. Override in subclasses."""
+    def _resolve(self, env_action : int | None, action : int) -> float | tuple[float,int]:
+        """Determine the reward given both moves. Override in subclasses.
+        """
         pass
 
     @abstractmethod
