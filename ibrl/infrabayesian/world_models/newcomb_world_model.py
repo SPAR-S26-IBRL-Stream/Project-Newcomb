@@ -62,7 +62,7 @@ class NewcombWorldModel(WorldModel):
         self.num_actions = self.reward_matrix.shape[0]
         assert self.reward_matrix.shape == (self.num_actions, self.num_actions)
 
-    def make_params(self, predictor_accuracy=1) -> NewcombWorldModelParameters:
+    def make_params(self, predictor_accuracy: float=1.0) -> NewcombWorldModelParameters:
         assert 0.5 <= predictor_accuracy <= 1.0
         return NewcombWorldModelParameters(coefficients=np.array([1.]),
             log_accuracy=np.log(np.maximum(np.array([[1-predictor_accuracy,predictor_accuracy]]),1e-300)))
