@@ -1,7 +1,6 @@
 # InfraBayesian Agent: Implementation Reference
 
 **Date**: 2026-03-28
-**Branch**: `alaro/coin-learning-ku`
 **Source of truth for**: the infrabayesian agent implementation in `ibrl/`
 
 This document walks through the infrabayesian (IB) agent's architecture, the

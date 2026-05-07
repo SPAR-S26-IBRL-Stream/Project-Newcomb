@@ -1,6 +1,5 @@
 # Refactor Plan: Generic `WorldModel` for `Infradistribution`
 
-**Branch**: `alaro/beliefs` (off `fllor/ib-agent-architecture`)
 **Date**: 2026-04-20 (supersedes 2026-04-18 draft)
 
 ---
