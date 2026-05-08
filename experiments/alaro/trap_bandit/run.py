@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from ibrl.agents import InfraBayesianAgent
@@ -27,6 +28,44 @@ REWARD_FUNCTION = np.array([
     [0.0, 1.0, -1000.0],
     [0.0, 1.0, -1000.0],
 ])
+
+CONDITION_LABELS = {
+    "correct": "Correctly specified prior",
+    "severely_misspecified": "Severely misspecified prior",
+}
+
+AGENT_LABELS = {
+    "ib": "Infra-Bayesian",
+    "bayes_greedy": "Greedy Bayesian",
+    "bayes_thompson": "Thompson Sampling Bayesian",
+}
+
+AGENT_COLORS = {
+    "ib": "tab:red",
+    "bayes_greedy": "tab:blue",
+    "bayes_thompson": "tab:orange",
+}
+
+LATEX_ROWS = [
+    ("0.99", "n/a", r"infra\_bayesian", "correct", "ib"),
+    ("0.99", "n/a", r"bayes\_ucb", "correct", "bayes_ucb"),
+    ("0.99", "0.99", r"bayes\_greedy", "correct", "bayes_greedy"),
+    ("0.99", "0.5", r"bayes\_greedy", "misspecified", "bayes_greedy"),
+    ("0.99", "0.01", r"bayes\_greedy", "severely_misspecified", "bayes_greedy"),
+    ("0.99", "0.99", r"bayes\_thompson", "correct", "bayes_thompson"),
+    ("0.99", "0.5", r"bayes\_thompson", "misspecified", "bayes_thompson"),
+    (
+        "0.99",
+        "0.01",
+        r"bayes\_thompson",
+        "severely_misspecified",
+        "bayes_thompson",
+    ),
+    ("0.01", "n/a", r"infra\_bayesian", "mostly_safe_correct", "ib"),
+    ("0.01", "n/a", r"bayes\_ucb", "mostly_safe_correct", "bayes_ucb"),
+    ("0.01", "0.01", r"bayes\_greedy", "mostly_safe_correct", "bayes_greedy"),
+    ("0.01", "0.01", r"bayes\_thompson", "mostly_safe_correct", "bayes_thompson"),
+]
 
 
 @dataclass
@@ -406,6 +445,109 @@ def save_bootstrap_summary(bootstrap: dict, output_path: Path) -> None:
     output_path.write_text(json.dumps(serializable))
 
 
+def load_summary(results_dir: Path, condition: str) -> dict:
+    return json.loads((results_dir / f"{condition}_summary.json").read_text())
+
+
+def plot_risky_condition_grid(
+    results_dir: Path,
+    *,
+    output_path: Path,
+    conditions: list[str],
+    agents: list[str],
+) -> None:
+    fig, axes = plt.subplots(len(conditions), 2, figsize=(9, 6), sharex=True)
+    if len(conditions) == 1:
+        axes = np.asarray([axes])
+
+    for row, condition in enumerate(conditions):
+        summary = load_summary(results_dir, condition)
+        ax_regret = axes[row, 0]
+        ax_trapped = axes[row, 1]
+
+        for agent in agents:
+            group = summary[agent]["risky"]
+            p5, p50, p95 = np.asarray(group["regret_p5_p50_p95"])
+            steps = np.arange(len(p50))
+            label = AGENT_LABELS.get(agent, agent)
+            linestyle = "--" if agent == "ib" else "-"
+            color = AGENT_COLORS.get(agent)
+            ax_regret.plot(
+                steps,
+                p50,
+                label=label,
+                linestyle=linestyle,
+                color=color,
+            )
+            ax_regret.fill_between(steps, p5, p95, alpha=0.12, color=color)
+
+            p5, p50, p95 = np.asarray(group["trapped_p5_p50_p95"])
+            ax_trapped.plot(
+                steps,
+                p50,
+                label=label,
+                linestyle=linestyle,
+                color=color,
+            )
+            ax_trapped.fill_between(steps, p5, p95, alpha=0.12, color=color)
+
+        ax_regret.set_ylabel(CONDITION_LABELS.get(condition, condition))
+        ax_regret.set_title("Cumulative expected regret" if row == 0 else "")
+        ax_trapped.set_title("Risky arm pull rate" if row == 0 else "")
+        ax_trapped.set_ylim(-0.02, 1.02)
+
+    axes[-1, 0].set_xlabel("step")
+    axes[-1, 1].set_xlabel("step")
+    axes[0, 1].legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+
+
+def ci_cell(point: float, ci: list[float]) -> str:
+    lo, hi = ci
+    return f"{point:.2f} [{lo:.2f}, {hi:.2f}]"
+
+
+def build_latex_table(results_dir: Path) -> str:
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\small",
+        r"\begin{tabular}{lll rcc}",
+        r"\toprule",
+        r"DGP $\alpha$ & Bayesian prior & Agent & Cat. rate & p50, 95\% CI & p95, 95\% CI \\",
+        r"\midrule",
+    ]
+
+    for dgp_alpha, bayes_prior, agent_label, condition, agent in LATEX_ROWS:
+        summary = json.loads((results_dir / f"{condition}_summary.json").read_text())
+        bootstrap = json.loads(
+            (results_dir / f"{condition}_bootstrap_summary.json").read_text()
+        )
+        cat = summary[agent]["catastrophe_rate"]
+        points = bootstrap[agent]["point"]
+        cis = bootstrap[agent]["ci"]
+        p50 = ci_cell(points[1], cis[1])
+        p95 = ci_cell(points[2], cis[2])
+        lines.append(
+            f"{dgp_alpha} & {bayes_prior} & {agent_label} & {cat:.3f} & {p50} & {p95} \\\\"
+        )
+
+    lines.extend([
+        r"\bottomrule",
+        r"\end{tabular}",
+        (
+            r"\caption{Final cumulative expected-regret percentiles with "
+            r"bootstrap confidence intervals.}"
+        ),
+        r"\label{tab:trap-bandit-results}",
+        r"\end{table}",
+        "",
+    ])
+    return "\n".join(lines)
+
+
 def raw_cache_path(output_dir: Path, condition_name: str) -> Path:
     return output_dir / f"{condition_name}_raw.npz"
 
@@ -508,6 +650,14 @@ def run_and_save(
         )
 
     config_path.write_text(json.dumps(payload, indent=2))
+    plot_risky_condition_grid(
+        output_dir,
+        output_path=output_dir / "risky_world_prior_comparison_grid.png",
+        conditions=["correct", "severely_misspecified"],
+        agents=["bayes_greedy", "bayes_thompson", "ib"],
+    )
+    if bootstrap_samples > 0:
+        (output_dir / "results.tex").write_text(build_latex_table(output_dir))
     return summaries
 
 
