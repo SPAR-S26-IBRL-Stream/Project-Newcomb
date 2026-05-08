@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..utils import dump_array
@@ -12,7 +11,7 @@ class BernoulliBayesianAgent(BaseGreedyAgent):
     arm's reward probability. Updates via conjugate rule on binary rewards.
     Picks the action with the largest posterior mean.
     """
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         return self.build_greedy_policy(self.values)
 
     def update(self, probabilities, action, outcome):

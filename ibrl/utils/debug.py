@@ -1,8 +1,7 @@
 import numpy as np
-from numpy.typing import NDArray
 
 
-def dump_array(array : NDArray[np.float64], format="%.2f") -> str:
+def dump_array(array : np.ndarray, format="%.2f") -> str:
     """
     Short string representation of array for debugging
     """
