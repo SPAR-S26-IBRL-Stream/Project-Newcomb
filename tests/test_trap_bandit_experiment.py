@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.trap_bandit import TrapBanditEnvironment
@@ -204,3 +205,20 @@ def test_thompson_sampling_returns_valid_policy():
     probs = agent.get_probabilities()
     assert probs.shape == (2,)
     assert np.isclose(probs.sum(), 1.0)
+
+
+def test_thompson_sampling_rejects_ku_multi_measure_hypothesis():
+    _wm, safe, risky = make_trap_bandit_hypotheses(num_grid=3, p_cat=0.01)
+    ib_h = make_ib_hypothesis(safe, risky)
+    agent = InfraBayesianAgent(
+        num_actions=2,
+        hypotheses=[ib_h],
+        prior=np.array([1.0]),
+        reward_function=REWARD_FUNCTION,
+        exploration_strategy=HypothesisThompsonSampling(),
+        epsilon=0.0,
+    )
+    agent.reset()
+
+    with pytest.raises(RuntimeError, match="single Bayesian mixture"):
+        agent.get_probabilities()

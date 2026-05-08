@@ -111,6 +111,11 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def sample_component_from_posterior(self):
         """Sample one complete component from a world model posterior mixture."""
+        if len(self.dist.measures) != 1:
+            raise RuntimeError(
+                "HypothesisThompsonSampling requires a single Bayesian mixture "
+                "measure; KU/multi-measure infradistributions are not supported. "
+            )
         measure = self.dist.measures[0]
         world_model = self.dist.world_model
         params = measure.params
