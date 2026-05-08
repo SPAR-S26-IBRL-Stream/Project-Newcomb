@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from ibrl.environments import (
-    BanditEnvironment, NewcombEnvironment, DeathInDamascusEnvironment,
+    BanditEnvironment, BernoulliBanditEnvironment, NewcombEnvironment, DeathInDamascusEnvironment,
     CoordinationGameEnvironment, PolicyDependentBanditEnvironment
 )
 
@@ -30,6 +30,17 @@ class TestNewcombEnvironment:
         optimal = newcomb_env.get_optimal_reward()
         assert isinstance(optimal, (int, float, np.integer, np.floating))
         assert optimal >= newcomb_env.reward_table.min()
+
+
+class TestBernoulliBanditEnvironment:
+    def test_step_sets_observation_to_sampled_outcome(self, seed):
+        env = BernoulliBanditEnvironment(num_actions=2, probs=[1.0, 0.0], seed=seed)
+        env.reset()
+
+        outcome = env.step(np.array([1.0, 0.0]), 0)
+
+        assert outcome.reward == 1.0
+        assert outcome.observation == 1
 
 
 class TestDeathInDamascusEnvironment:

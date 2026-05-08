@@ -7,7 +7,6 @@ from ..infrabayesian.builders.trap_bandit import (
     OUTCOME_ONE,
     OUTCOME_ZERO,
 )
-from ..outcome import Outcome
 
 
 class TrapBanditEnvironment(BaseEnvironment):
@@ -31,27 +30,27 @@ class TrapBanditEnvironment(BaseEnvironment):
         self.catastrophe_reward = catastrophe_reward
         self.trapped_arm = 0 if p1 >= p2 else 1
 
-    def step(self, probabilities, action: int) -> Outcome:
-        reward, outcome_index = self._sample_action(action)
-        return Outcome(reward=reward, observation=outcome_index)
+    def _respond(self, probabilities, action: int) -> int:
+        return self._sample_outcome(action)
 
     def _resolve(self, observation, action):
-        reward, _outcome_index = self._sample_action(action)
-        return reward
+        if observation == OUTCOME_CATASTROPHE:
+            return self.catastrophe_reward
+        return float(observation == OUTCOME_ONE)
 
-    def _sample_action(self, action: int) -> tuple[float, int]:
+    def _sample_outcome(self, action: int) -> int:
         p = self.p1 if action == 0 else self.p2
         if self.risky and action == self.trapped_arm:
             u = self.random.random()
             if u < self.p_cat:
-                return self.catastrophe_reward, OUTCOME_CATASTROPHE
+                return OUTCOME_CATASTROPHE
             if u < self.p_cat + p:
-                return 1.0, OUTCOME_ONE
-            return 0.0, OUTCOME_ZERO
+                return OUTCOME_ONE
+            return OUTCOME_ZERO
 
         if self.random.random() < p:
-            return 1.0, OUTCOME_ONE
-        return 0.0, OUTCOME_ZERO
+            return OUTCOME_ONE
+        return OUTCOME_ZERO
 
     def expected_value(self, action: int) -> float:
         p = self.p1 if action == 0 else self.p2

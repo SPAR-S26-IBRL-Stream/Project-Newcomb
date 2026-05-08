@@ -28,7 +28,7 @@ class BaseNewcombLikeEnvironment(BaseEnvironment):
         self.reward_table = np.array(reward_table)
         self.predictor_accuracy = float(predictor_accuracy)
 
-    def _respond(self, probabilities : np.ndarray) -> int:
+    def _respond(self, probabilities : np.ndarray, action : int) -> int:
         perfect_prediction = probabilities
         random_prediction = np.ones(self.num_actions) / self.num_actions
         prediction = perfect_prediction * (2*self.predictor_accuracy - 1) \
