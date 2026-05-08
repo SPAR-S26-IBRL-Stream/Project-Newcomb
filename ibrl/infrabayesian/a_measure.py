@@ -20,12 +20,12 @@ class AMeasure:
         self.offset = np.float64(offset)
 
     def evaluate_action(self, world_model, belief_state, reward_function : np.ndarray,
-                        action : int, policy=None) -> float:
+                        action : int, policy) -> float:
         """
         Compute the scaled and shifted expected value of a given reward function, defined as λ*μ(f) + b
         """
         return self.scale * world_model.compute_expected_reward(
-            belief_state, reward_function, self.params, action=action, policy=policy
+            belief_state, reward_function, self.params, action, policy
         ) + self.offset
 
     def reset(self):

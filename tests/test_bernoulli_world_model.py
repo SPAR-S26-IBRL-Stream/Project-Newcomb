@@ -35,7 +35,7 @@ def obs(reward: float) -> Outcome:
 def test_e_h_zero_is_zero():
     """E_H([0, 0]) == 0 at initialization."""
     dist = make_dist()
-    assert abs(dist.evaluate_action(np.zeros(2), action=ARM)) < 1e-9
+    assert abs(dist.evaluate_action(np.zeros(2), ARM, None)) < 1e-9
 
 
 def test_e_h_zero_stays_zero_after_updates():
@@ -43,13 +43,13 @@ def test_e_h_zero_stays_zero_after_updates():
     dist = make_dist()
     rf = np.tile(REWARD, (NUM_ARMS, 1))
     for r in [1., 0., 1., 1., 0.]:
-        dist.update(rf, obs(r), action=ARM)
-    assert abs(dist.evaluate_action(np.zeros(2), action=ARM)) < 1e-9
+        dist.update(rf, obs(r), ARM, None)
+    assert abs(dist.evaluate_action(np.zeros(2), ARM, None)) < 1e-9
 
 
 def test_evaluate_action_in_unit_interval():
     dist = make_dist()
-    v = dist.evaluate_action(REWARD, action=ARM)
+    v = dist.evaluate_action(REWARD, ARM, None)
     assert 0. <= v <= 1.
 
 
@@ -58,21 +58,21 @@ def test_evaluate_action_in_unit_interval():
 def test_update_increases_evaluate_action_after_rewards():
     dist = make_dist()
     rf = np.tile(REWARD, (NUM_ARMS, 1))
-    ev_before = dist.evaluate_action(REWARD, action=ARM)
+    ev_before = dist.evaluate_action(REWARD, ARM, None)
     for _ in range(20):
-        dist.update(rf, obs(1.), action=ARM)
-    assert dist.evaluate_action(REWARD, action=ARM) > ev_before
+        dist.update(rf, obs(1.), ARM, None)
+    assert dist.evaluate_action(REWARD, ARM, None) > ev_before
 
 
 def test_update_decreases_evaluate_action_after_no_rewards():
     dist = make_dist()
     rf = np.tile(REWARD, (NUM_ARMS, 1))
     for _ in range(5):
-        dist.update(rf, obs(1.), action=ARM)
-    ev_before = dist.evaluate_action(REWARD, action=ARM)
+        dist.update(rf, obs(1.), ARM, None)
+    ev_before = dist.evaluate_action(REWARD, ARM, None)
     for _ in range(20):
-        dist.update(rf, obs(0.), action=ARM)
-    assert dist.evaluate_action(REWARD, action=ARM) < ev_before
+        dist.update(rf, obs(0.), ARM, None)
+    assert dist.evaluate_action(REWARD, ARM, None) < ev_before
 
 
 # ── Scale and offset invariants ─────────────────────────────────────────────
@@ -81,7 +81,7 @@ def test_scale_and_offset_nonnegative():
     dist = make_dist()
     rf = np.tile(REWARD, (NUM_ARMS, 1))
     for r in [1., 0., 1., 1., 0., 0., 1.]:
-        dist.update(rf, obs(r), action=ARM)
+        dist.update(rf, obs(r), ARM, None)
     for m in dist.measures:
         assert m.scale >= 0.
         assert m.offset >= 0.
@@ -94,7 +94,7 @@ def test_pure_measure_evaluate_action():
         [AMeasure(wm.make_params([np.array([0.3, 0.7])]))],
         world_model=wm,
     )
-    assert abs(dist.evaluate_action(REWARD, action=ARM) - 0.7) < 1e-6
+    assert abs(dist.evaluate_action(REWARD, ARM, None) - 0.7) < 1e-6
 
 
 # ── Mix variants ────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ def test_mix_bayesian_average():
     d_high = Infradistribution([AMeasure(wm.make_params([np.array([0.2, 0.8])]))], world_model=wm)
     dist = Infradistribution.mix([d_low, d_high], np.array([0.5, 0.5]))
     # Both arms equal weight → average expected reward = 0.5 * 0.2 + 0.5 * 0.8 = 0.5
-    assert abs(dist.evaluate_action(REWARD, action=ARM) - 0.5) < 1e-6
+    assert abs(dist.evaluate_action(REWARD, ARM, None) - 0.5) < 1e-6
 
 
 def test_mixku_pessimistic():
@@ -116,7 +116,7 @@ def test_mixku_pessimistic():
     d_high = Infradistribution([AMeasure(wm.make_params([np.array([0.2, 0.8])]))], world_model=wm)
     dist = Infradistribution.mixKU([d_low, d_high])
     # Pessimistic: min(0.2, 0.8) = 0.2
-    assert abs(dist.evaluate_action(REWARD, action=ARM) - 0.2) < 1e-6
+    assert abs(dist.evaluate_action(REWARD, ARM, None) - 0.2) < 1e-6
 
 
 # ── DiscreteBayesianAgent equivalence ──────────────────────────────────────

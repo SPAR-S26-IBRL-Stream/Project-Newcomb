@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseGreedyAgent
 from ..utils import dump_array
@@ -13,7 +12,7 @@ class BayesianAgent(BaseGreedyAgent):
     Update this estimate at each iteration based on the observed information.
     Picks the action with the largest expected reward.
     """
-    def get_probabilities(self) -> NDArray[np.float64]:
+    def get_probabilities(self) -> np.ndarray:
         return self.build_greedy_policy(self.values)
 
     def update(self, probabilities, action, outcome):
