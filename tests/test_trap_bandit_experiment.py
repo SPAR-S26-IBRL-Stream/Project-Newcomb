@@ -161,7 +161,7 @@ def test_trap_bandit_hypothesis_builders_construct_agents():
         hypotheses=[ib_h],
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
-        exploration_strategy=Greedy(),
+        exploration_strategy=None,
         epsilon=0.0,
     )
     bayes.reset()
@@ -220,5 +220,22 @@ def test_thompson_sampling_rejects_ku_multi_measure_hypothesis():
     )
     agent.reset()
 
-    with pytest.raises(RuntimeError, match="single Bayesian mixture"):
+    with pytest.raises(RuntimeError, match="exploration_strategy=None"):
+        agent.get_probabilities()
+
+
+def test_exploration_strategy_rejects_ku_multi_measure_hypothesis():
+    _wm, safe, risky = make_trap_bandit_hypotheses(num_grid=3, p_cat=0.01)
+    ib_h = make_ib_hypothesis(safe, risky)
+    agent = InfraBayesianAgent(
+        num_actions=2,
+        hypotheses=[ib_h],
+        prior=np.array([1.0]),
+        reward_function=REWARD_FUNCTION,
+        exploration_strategy=Greedy(),
+        epsilon=0.0,
+    )
+    agent.reset()
+
+    with pytest.raises(RuntimeError, match="exploration_strategy=None"):
         agent.get_probabilities()

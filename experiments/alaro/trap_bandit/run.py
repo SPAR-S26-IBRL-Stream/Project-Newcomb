@@ -86,7 +86,7 @@ def make_agent(
         )
     if kind == "ib":
         hypothesis = make_ib_hypothesis(safe, risky)
-        strategy = Greedy()
+        strategy = None
     else:
         hypothesis = make_bayesian_hypothesis(safe, risky, alpha_beta=alpha_prior)
         if kind == "bayes_greedy":

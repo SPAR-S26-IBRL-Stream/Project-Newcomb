@@ -73,6 +73,12 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def get_probabilities(self) -> np.ndarray:
         if self.exploration_strategy is not None:
+            if len(self.dist.measures) != 1:
+                raise RuntimeError(
+                    "Multi-measure infradistributions require "
+                    "exploration_strategy=None until IB exploration "
+                    "semantics are defined."
+                )
             return self.exploration_strategy.get_probabilities(self, self._action_values())
 
         # Greedy policy: reproduces classical agent, breaks regret bounds
