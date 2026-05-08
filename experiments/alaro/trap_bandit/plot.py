@@ -7,8 +7,8 @@ import numpy as np
 
 AGENT_LABELS = {
     "ib": "Infra-Bayesian",
-    "bayes_greedy": "Greedy Bayesian",
-    "bayes_thompson": "Thompson Sampling Bayesian",
+    "bayes_greedy": "Bayesian Greedy",
+    "bayes_thompson": "Bayesian Thompson Sampling",
     "bayes_ucb": "Bayesian UCB",
 }
 

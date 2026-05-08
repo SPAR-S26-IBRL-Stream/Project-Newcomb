@@ -36,8 +36,8 @@ CONDITION_LABELS = {
 
 AGENT_LABELS = {
     "ib": "Infra-Bayesian",
-    "bayes_greedy": "Greedy Bayesian",
-    "bayes_thompson": "Thompson Sampling Bayesian",
+    "bayes_greedy": "Bayesian Greedy",
+    "bayes_thompson": "Bayesian Thompson Sampling",
     "bayes_ucb": "Bayesian UCB",
 }
 
@@ -48,9 +48,11 @@ AGENT_COLORS = {
     "bayes_ucb": "tab:green",
 }
 
-LATEX_ROWS = [
+RESULT_TABLE_ROWS = [
     ("0.99", "n/a", r"infra\_bayesian", "correct", "ib"),
     ("0.99", "0.99", r"bayes\_ucb", "correct", "bayes_ucb"),
+    ("0.99", "0.5", r"bayes\_ucb", "misspecified", "bayes_ucb"),
+    ("0.99", "0.01", r"bayes\_ucb", "severely_misspecified", "bayes_ucb"),
     ("0.99", "0.99", r"bayes\_greedy", "correct", "bayes_greedy"),
     ("0.99", "0.5", r"bayes\_greedy", "misspecified", "bayes_greedy"),
     ("0.99", "0.01", r"bayes\_greedy", "severely_misspecified", "bayes_greedy"),
@@ -529,7 +531,7 @@ def build_latex_table(results_dir: Path) -> str:
         r"\midrule",
     ]
 
-    for dgp_alpha, bayes_prior, agent_label, condition, agent in LATEX_ROWS:
+    for dgp_alpha, bayes_prior, agent_label, condition, agent in RESULT_TABLE_ROWS:
         summary = json.loads((results_dir / f"{condition}_summary.json").read_text())
         bootstrap = json.loads(
             (results_dir / f"{condition}_bootstrap_summary.json").read_text()
@@ -554,6 +556,36 @@ def build_latex_table(results_dir: Path) -> str:
         r"\end{table}",
         "",
     ])
+    return "\n".join(lines)
+
+
+def markdown_agent_label(agent_label: str) -> str:
+    return agent_label.replace(r"\_", "_")
+
+
+def build_markdown_table(results_dir: Path) -> str:
+    lines = [
+        "| DGP alpha | Bayesian prior | agent | catastrophe rate | p5, 95% CI | p50, 95% CI | p95, 95% CI |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+
+    for dgp_alpha, bayes_prior, agent_label, condition, agent in RESULT_TABLE_ROWS:
+        summary = json.loads((results_dir / f"{condition}_summary.json").read_text())
+        bootstrap = json.loads(
+            (results_dir / f"{condition}_bootstrap_summary.json").read_text()
+        )
+        cat = summary[agent]["catastrophe_rate"]
+        points = bootstrap[agent]["point"]
+        cis = bootstrap[agent]["ci"]
+        p5 = ci_cell(points[0], cis[0])
+        p50 = ci_cell(points[1], cis[1])
+        p95 = ci_cell(points[2], cis[2])
+        lines.append(
+            f"| {dgp_alpha} | {bayes_prior} | {markdown_agent_label(agent_label)} | "
+            f"{cat:.3f} | {p5} | {p50} | {p95} |"
+        )
+
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -667,6 +699,7 @@ def run_and_save(
     )
     if bootstrap_samples > 0:
         (output_dir / "results.tex").write_text(build_latex_table(output_dir))
+        (output_dir / "results_table.md").write_text(build_markdown_table(output_dir))
     return summaries
 
 
