@@ -5,8 +5,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+AGENT_LABELS = {
+    "ib": "Infra-Bayesian",
+    "bayes_greedy": "Greedy Bayesian",
+    "bayes_thompson": "Thompson Sampling Bayesian",
+    "bayes_ucb": "Bayesian UCB",
+    "bayes_empirical_ucb": "Empirical UCB",
+}
+
+
 def line_style(kind: str) -> str:
     return "--" if kind == "ib" else "-"
+
+
+def agent_label(kind: str) -> str:
+    return AGENT_LABELS.get(kind, kind)
 
 
 def plot_percentile_band(summary: dict, metric: str, title: str, output_path: str) -> None:
@@ -14,7 +27,7 @@ def plot_percentile_band(summary: dict, metric: str, title: str, output_path: st
     for kind, values in summary.items():
         p5, p50, p95 = values[metric]
         steps = np.arange(len(p50))
-        ax.plot(steps, p50, label=kind, linestyle=line_style(kind))
+        ax.plot(steps, p50, label=agent_label(kind), linestyle=line_style(kind))
         ax.fill_between(steps, p5, p95, alpha=0.15)
     ax.set_title(title)
     ax.set_xlabel("step")
@@ -29,7 +42,7 @@ def plot_log_regret(summary: dict, title: str, output_path: str) -> None:
     for kind, values in summary.items():
         p5, p50, p95 = values["regret_p5_p50_p95"]
         steps = np.arange(len(p50))
-        ax.plot(steps, np.log1p(p50), label=kind, linestyle=line_style(kind))
+        ax.plot(steps, np.log1p(p50), label=agent_label(kind), linestyle=line_style(kind))
         ax.fill_between(steps, np.log1p(p5), np.log1p(p95), alpha=0.15)
     ax.set_title(title)
     ax.set_xlabel("step")
@@ -54,11 +67,11 @@ def plot_condition_grid(summary: dict, title: str, output_path: str) -> None:
             group = values[group_key]
             p5, p50, p95 = group["regret_p5_p50_p95"]
             steps = np.arange(len(p50))
-            ax_regret.plot(steps, np.log1p(p50), label=kind, linestyle=line_style(kind))
+            ax_regret.plot(steps, np.log1p(p50), label=agent_label(kind), linestyle=line_style(kind))
             ax_regret.fill_between(steps, np.log1p(p5), np.log1p(p95), alpha=0.12)
 
             p5, p50, p95 = group["trapped_p5_p50_p95"]
-            ax_trapped.plot(steps, p50, label=kind, linestyle=line_style(kind))
+            ax_trapped.plot(steps, p50, label=agent_label(kind), linestyle=line_style(kind))
             ax_trapped.fill_between(steps, p5, p95, alpha=0.12)
 
         ax_regret.set_ylabel(group_label)

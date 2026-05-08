@@ -10,7 +10,9 @@ from .experimental2 import ExperimentalAgent2
 from .experimental3 import ExperimentalAgent3
 from .infrabayesian import InfraBayesianAgent
 from ..exploration import (
+    BayesianUCB,
     EpsilonGreedy,
+    EmpiricalUCB,
     ExplorationStrategy,
     Greedy,
     HypothesisThompsonSampling,
@@ -31,7 +33,9 @@ __all__ = [
     "ExperimentalAgent2",
     "ExperimentalAgent3",
     "InfraBayesianAgent",
+    "BayesianUCB",
     "EpsilonGreedy",
+    "EmpiricalUCB",
     "ExplorationStrategy",
     "Greedy",
     "HypothesisThompsonSampling",

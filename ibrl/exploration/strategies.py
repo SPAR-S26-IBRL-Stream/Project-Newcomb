@@ -51,7 +51,7 @@ class UniformPrefixThen(ExplorationStrategy):
         return self.base_strategy.get_probabilities(agent, values)
 
 
-class UCB(ExplorationStrategy):
+class EmpiricalUCB(ExplorationStrategy):
     """Empirical UCB over realized scalar rewards."""
 
     def __init__(self, c: float = 2.0):
@@ -68,6 +68,33 @@ class UCB(ExplorationStrategy):
         return best.astype(float) / best.sum()
 
 
+class BayesianUCB(ExplorationStrategy):
+    """Posterior action-value quantile UCB for Bayesian component mixtures."""
+
+    def __init__(self, quantile: float = 0.95):
+        assert 0.0 <= quantile <= 1.0
+        self.quantile = float(quantile)
+
+    def get_probabilities(self, agent, values: np.ndarray) -> np.ndarray:
+        component_values, weights = agent.posterior_component_action_values()
+        scores = np.array([
+            self._weighted_quantile(component_values[:, action], weights, self.quantile)
+            for action in range(agent.num_actions)
+        ])
+        best = np.isclose(scores, scores.max())
+        return best.astype(float) / best.sum()
+
+    @staticmethod
+    def _weighted_quantile(values: np.ndarray, weights: np.ndarray, quantile: float) -> float:
+        order = np.argsort(values)
+        sorted_values = values[order]
+        sorted_weights = weights[order]
+        cumulative = np.cumsum(sorted_weights)
+        cumulative /= cumulative[-1]
+        idx = int(np.searchsorted(cumulative, quantile, side="left"))
+        return float(sorted_values[min(idx, len(sorted_values) - 1)])
+
+
 class HypothesisThompsonSampling(ExplorationStrategy):
     """Sample one posterior component/hypothesis, then act greedily under it."""
 
@@ -80,3 +107,4 @@ class HypothesisThompsonSampling(ExplorationStrategy):
 
 # Backwards-compatible alias for the original export name.
 ThompsonSampling = HypothesisThompsonSampling
+UCB = EmpiricalUCB

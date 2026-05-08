@@ -129,6 +129,28 @@ class InfraBayesianAgent(BaseGreedyAgent):
         idx = int(self.random.choice(len(params.components), p=weights))
         return params.components[idx]
 
+    def posterior_component_action_values(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return component action values and posterior weights for one Bayesian measure."""
+        if len(self.dist.measures) != 1:
+            raise RuntimeError(
+                "Bayesian posterior component exploration requires a single "
+                "Bayesian mixture measure."
+        )
+        measure = self.dist.measures[0]
+        world_model = self.dist.world_model
+        params = measure.params
+        if not hasattr(params, "components"):
+            raise RuntimeError(
+                "Bayesian posterior component exploration requires finite mixture "
+                "world-model parameters."
+            )
+        weights = world_model.get_posterior_component_weights(self.dist.belief_state, params)
+        component_values = np.array([
+            world_model.get_component_expected_rewards(component, self.reward_function)
+            for component in params.components
+        ])
+        return component_values, weights
+
     def values_for_component(self, component) -> np.ndarray:
         return self.dist.world_model.get_component_expected_rewards(component, self.reward_function)
 

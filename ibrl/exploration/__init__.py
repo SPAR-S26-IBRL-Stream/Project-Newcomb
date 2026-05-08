@@ -1,7 +1,9 @@
 """Exploration and action-selection strategies."""
 
 from .strategies import (
+    BayesianUCB,
     EpsilonGreedy,
+    EmpiricalUCB,
     ExplorationStrategy,
     Greedy,
     HypothesisThompsonSampling,
@@ -11,7 +13,9 @@ from .strategies import (
 )
 
 __all__ = [
+    "BayesianUCB",
     "EpsilonGreedy",
+    "EmpiricalUCB",
     "ExplorationStrategy",
     "Greedy",
     "HypothesisThompsonSampling",

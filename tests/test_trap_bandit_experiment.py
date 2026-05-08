@@ -3,7 +3,7 @@ import pytest
 
 from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.trap_bandit import TrapBanditEnvironment
-from ibrl.exploration import Greedy, HypothesisThompsonSampling, UCB
+from ibrl.exploration import BayesianUCB, EmpiricalUCB, Greedy, HypothesisThompsonSampling
 from ibrl.infrabayesian.builders.trap_bandit import (
     make_bayesian_hypothesis,
     make_ib_hypothesis,
@@ -133,14 +133,31 @@ def test_risky_80_condition_preset_uses_requested_priors():
     }
 
 
-def test_ucb_tries_unpulled_actions():
+def test_empirical_ucb_tries_unpulled_actions():
     class Agent:
         num_actions = 2
         action_counts = np.array([10, 0])
         empirical_values = np.array([1.0, 0.0])
         step = 11
-    probs = UCB().get_probabilities(Agent(), np.array([1.0, 0.0]))
+    probs = EmpiricalUCB().get_probabilities(Agent(), np.array([1.0, 0.0]))
     np.testing.assert_allclose(probs, [0.0, 1.0])
+
+
+def test_bayesian_ucb_returns_valid_policy():
+    _wm, safe, risky = make_trap_bandit_hypotheses(num_grid=3, p_cat=0.01)
+    bayes_h = make_bayesian_hypothesis(safe, risky, alpha_beta=(2.0, 2.0))
+    agent = InfraBayesianAgent(
+        num_actions=2,
+        hypotheses=[bayes_h],
+        prior=np.array([1.0]),
+        reward_function=REWARD_FUNCTION,
+        exploration_strategy=BayesianUCB(quantile=0.95),
+        epsilon=0.0,
+    )
+    agent.reset()
+    probs = agent.get_probabilities()
+    assert probs.shape == (2,)
+    assert np.isclose(probs.sum(), 1.0)
 
 
 def test_trap_bandit_hypothesis_builders_construct_agents():

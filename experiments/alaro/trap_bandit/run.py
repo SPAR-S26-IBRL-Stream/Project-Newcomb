@@ -13,7 +13,7 @@ import numpy as np
 
 from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.trap_bandit import TrapBanditEnvironment
-from ibrl.exploration import Greedy, HypothesisThompsonSampling, UCB
+from ibrl.exploration import BayesianUCB, EmpiricalUCB, Greedy, HypothesisThompsonSampling
 from ibrl.infrabayesian.builders.trap_bandit import (
     OUTCOME_CATASTROPHE,
     make_bayesian_hypothesis,
@@ -38,17 +38,22 @@ AGENT_LABELS = {
     "ib": "Infra-Bayesian",
     "bayes_greedy": "Greedy Bayesian",
     "bayes_thompson": "Thompson Sampling Bayesian",
+    "bayes_ucb": "Bayesian UCB",
+    "bayes_empirical_ucb": "Empirical UCB",
 }
 
 AGENT_COLORS = {
     "ib": "tab:red",
     "bayes_greedy": "tab:blue",
     "bayes_thompson": "tab:orange",
+    "bayes_ucb": "tab:green",
+    "bayes_empirical_ucb": "tab:purple",
 }
 
 LATEX_ROWS = [
     ("0.99", "n/a", r"infra\_bayesian", "correct", "ib"),
-    ("0.99", "n/a", r"bayes\_ucb", "correct", "bayes_ucb"),
+    ("0.99", "0.99", r"bayes\_ucb", "correct", "bayes_ucb"),
+    ("0.99", "n/a", r"empirical\_ucb", "correct", "bayes_empirical_ucb"),
     ("0.99", "0.99", r"bayes\_greedy", "correct", "bayes_greedy"),
     ("0.99", "0.5", r"bayes\_greedy", "misspecified", "bayes_greedy"),
     ("0.99", "0.01", r"bayes\_greedy", "severely_misspecified", "bayes_greedy"),
@@ -62,9 +67,18 @@ LATEX_ROWS = [
         "bayes_thompson",
     ),
     ("0.01", "n/a", r"infra\_bayesian", "mostly_safe_correct", "ib"),
-    ("0.01", "n/a", r"bayes\_ucb", "mostly_safe_correct", "bayes_ucb"),
+    ("0.01", "0.01", r"bayes\_ucb", "mostly_safe_correct", "bayes_ucb"),
+    ("0.01", "n/a", r"empirical\_ucb", "mostly_safe_correct", "bayes_empirical_ucb"),
     ("0.01", "0.01", r"bayes\_greedy", "mostly_safe_correct", "bayes_greedy"),
     ("0.01", "0.01", r"bayes\_thompson", "mostly_safe_correct", "bayes_thompson"),
+]
+
+DEFAULT_KINDS = [
+    "bayes_greedy",
+    "bayes_thompson",
+    "bayes_ucb",
+    "bayes_empirical_ucb",
+    "ib",
 ]
 
 
@@ -133,7 +147,9 @@ def make_agent(
         elif kind == "bayes_thompson":
             strategy = HypothesisThompsonSampling()
         elif kind == "bayes_ucb":
-            strategy = UCB(c=2.0)
+            strategy = BayesianUCB(quantile=0.95)
+        elif kind == "bayes_empirical_ucb":
+            strategy = EmpiricalUCB(c=2.0)
         else:
             raise ValueError(f"unknown agent kind {kind}")
 
@@ -260,7 +276,7 @@ def run_condition(
         config = replace(config, alpha_dgp=alpha_dgp)
     rng = np.random.default_rng(config.seed)
     if kinds is None:
-        kinds = ["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"]
+        kinds = DEFAULT_KINDS
     results = {kind: [] for kind in kinds}
     _wm, safe, risky = make_trap_bandit_hypotheses(
         num_grid=config.num_grid,
@@ -589,7 +605,7 @@ def run_and_save(
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     if kinds is None:
-        kinds = ["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"]
+        kinds = DEFAULT_KINDS
     conditions = get_conditions(config)
     payload = config_payload(config, kinds)
     payload["config_hash"] = config_hash(payload)
@@ -654,7 +670,7 @@ def run_and_save(
         output_dir,
         output_path=output_dir / "risky_world_prior_comparison_grid.png",
         conditions=["correct", "severely_misspecified"],
-        agents=["bayes_greedy", "bayes_thompson", "ib"],
+        agents=["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"],
     )
     if bootstrap_samples > 0:
         (output_dir / "results.tex").write_text(build_latex_table(output_dir))
@@ -702,7 +718,7 @@ def parse_args():
     parser.add_argument(
         "--kinds",
         nargs="*",
-        default=["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"],
+        default=DEFAULT_KINDS,
     )
     return parser.parse_args()
 
