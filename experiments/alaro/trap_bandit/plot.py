@@ -10,7 +10,6 @@ AGENT_LABELS = {
     "bayes_greedy": "Greedy Bayesian",
     "bayes_thompson": "Thompson Sampling Bayesian",
     "bayes_ucb": "Bayesian UCB",
-    "bayes_empirical_ucb": "Empirical UCB",
 }
 
 

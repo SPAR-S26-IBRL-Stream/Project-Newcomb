@@ -13,7 +13,7 @@ import numpy as np
 
 from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.trap_bandit import TrapBanditEnvironment
-from ibrl.exploration import BayesianUCB, EmpiricalUCB, Greedy, HypothesisThompsonSampling
+from ibrl.exploration import BayesianUCB, Greedy, HypothesisThompsonSampling
 from ibrl.infrabayesian.builders.trap_bandit import (
     OUTCOME_CATASTROPHE,
     make_bayesian_hypothesis,
@@ -39,7 +39,6 @@ AGENT_LABELS = {
     "bayes_greedy": "Greedy Bayesian",
     "bayes_thompson": "Thompson Sampling Bayesian",
     "bayes_ucb": "Bayesian UCB",
-    "bayes_empirical_ucb": "Empirical UCB",
 }
 
 AGENT_COLORS = {
@@ -47,13 +46,11 @@ AGENT_COLORS = {
     "bayes_greedy": "tab:blue",
     "bayes_thompson": "tab:orange",
     "bayes_ucb": "tab:green",
-    "bayes_empirical_ucb": "tab:purple",
 }
 
 LATEX_ROWS = [
     ("0.99", "n/a", r"infra\_bayesian", "correct", "ib"),
     ("0.99", "0.99", r"bayes\_ucb", "correct", "bayes_ucb"),
-    ("0.99", "n/a", r"empirical\_ucb", "correct", "bayes_empirical_ucb"),
     ("0.99", "0.99", r"bayes\_greedy", "correct", "bayes_greedy"),
     ("0.99", "0.5", r"bayes\_greedy", "misspecified", "bayes_greedy"),
     ("0.99", "0.01", r"bayes\_greedy", "severely_misspecified", "bayes_greedy"),
@@ -68,7 +65,6 @@ LATEX_ROWS = [
     ),
     ("0.01", "n/a", r"infra\_bayesian", "mostly_safe_correct", "ib"),
     ("0.01", "0.01", r"bayes\_ucb", "mostly_safe_correct", "bayes_ucb"),
-    ("0.01", "n/a", r"empirical\_ucb", "mostly_safe_correct", "bayes_empirical_ucb"),
     ("0.01", "0.01", r"bayes\_greedy", "mostly_safe_correct", "bayes_greedy"),
     ("0.01", "0.01", r"bayes\_thompson", "mostly_safe_correct", "bayes_thompson"),
 ]
@@ -77,7 +73,6 @@ DEFAULT_KINDS = [
     "bayes_greedy",
     "bayes_thompson",
     "bayes_ucb",
-    "bayes_empirical_ucb",
     "ib",
 ]
 
@@ -148,8 +143,6 @@ def make_agent(
             strategy = HypothesisThompsonSampling()
         elif kind == "bayes_ucb":
             strategy = BayesianUCB(quantile=0.95)
-        elif kind == "bayes_empirical_ucb":
-            strategy = EmpiricalUCB(c=2.0)
         else:
             raise ValueError(f"unknown agent kind {kind}")
 
