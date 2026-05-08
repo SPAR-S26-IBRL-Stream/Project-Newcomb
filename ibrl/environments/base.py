@@ -37,15 +37,19 @@ class BaseEnvironment(ABC):
     def step(self, probabilities : np.ndarray, action : int) -> Outcome:
         """Execute one round of interaction.
 
-        The environment first responds to the agent's policy (e.g. the predictor
-        samples a prediction), then resolves the payoff given the agent's action.
+        For standard bandits, this just samples an observation/reward based on the action
+        For Newcomb-like environments, there are two-steps:
+        - Respond to the agent's policy (e.g. the predictor samples a prediction)
+        - Resolve the payoff given the agent's action
 
         Arguments:
             probabilities: The agent's policy (probability distribution over actions)
             action:        The action sampled from the policy
 
         Returns:
-            Outcome containing the reward and any environment action
+            Outcome containing:
+                the obtained reward (float)
+                a discrete observation (int)
         """
         observation = self._respond(probabilities)
         reward = self._resolve(observation, action)

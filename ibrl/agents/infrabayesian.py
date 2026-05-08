@@ -77,14 +77,14 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
         # Greedy policy: reproduces classical agent, breaks regret bounds
         if self.exploration_prefix is None:
-            return self.build_greedy_policy(self._expected_rewards())
+            return self.build_greedy_policy(self._action_values())
 
         # Forced exploration prefix: regret bounds asymptotically preserved
-        if self.step < self.exploration_prefix:
+        if self.step <= self.exploration_prefix:
             return np.ones(self.num_actions) / self.num_actions
 
         # Use optimal policy: no exploration, almost no learning
-        return self._expected_rewards()
+        return self._optimal_policy()
 
     def dump_state(self) -> str:
         state = str(self.dist.belief_state)
@@ -93,14 +93,11 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return state
 
     def _expected_rewards(self) -> np.ndarray:
-        expected_rewards = np.array([
+        """Expected reward of each policy."""
+        return np.array([
             sum(self._action_values_for_policy(policy) * policy)
             for policy in self.policies
         ])
-
-        # Find all optimal policies, sum them up and normalise
-        optimal_policies = np.isclose(expected_rewards, expected_rewards.max())
-        return (self.policies*np.expand_dims(optimal_policies,axis=1)).sum(axis=0) / sum(optimal_policies)
 
     def _action_values(self) -> np.ndarray:
         policy = np.ones(self.num_actions) / self.num_actions
@@ -123,3 +120,10 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def values_for_component(self, component) -> np.ndarray:
         return self.dist.world_model.get_component_expected_rewards(component, self.reward_function)
+
+    def _optimal_policy(self) -> np.ndarray:
+        """Policy that maximises expected reward"""
+        expected_rewards = self._expected_rewards()
+        # Find all optimal policies, sum them up and normalise
+        optimal_policies = np.isclose(expected_rewards, expected_rewards.max())
+        return (self.policies*np.expand_dims(optimal_policies,axis=1)).sum(axis=0) / sum(optimal_policies)
