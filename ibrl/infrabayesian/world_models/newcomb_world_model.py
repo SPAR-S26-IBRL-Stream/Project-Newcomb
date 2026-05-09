@@ -100,9 +100,9 @@ class NewcombWorldModel(WorldModel):
             state : NewcombWorldModelBeliefState,
             outcome : Outcome,
             action : int,
-            policy : np.ndarray | None):
+            policy : np.ndarray):
         new_state = NewcombWorldModelBeliefState(state.history.copy())
-        if policy is not None and np.isclose(policy[action], 1):
+        if np.isclose(policy[action], 1):
             # The right/wrong history only supports predictor-accuracy learning
             # for pure policies. Mixed-policy learning would require storing
             # policy-conditioned likelihood evidence instead of binary counts.
@@ -172,12 +172,10 @@ class NewcombWorldModel(WorldModel):
     def _prediction(self,
             state : NewcombWorldModelBeliefState,
             params : NewcombWorldModelParameters,
-            policy : np.ndarray | None) -> np.ndarray:
+            policy : np.ndarray) -> np.ndarray:
         """
         Compute/estimate the prediction that the predictor will make
         """
-        if policy is None:
-            policy = np.ones(self.num_actions) / self.num_actions
 
         # Estimate predictor accuracy based hypotheses and observations
         log_likelihood = (params.log_accuracy @ state.history)
