@@ -115,8 +115,7 @@ class Infradistribution:
         for measure, likelihood in zip(self.measures, likelihoods):
             measure.scale *= likelihood
         self.belief_state = self.world_model.update_state(
-            self.belief_state, outcome, action, policy,
-            params=self.measures[0].params)
+            self.belief_state, outcome, action, policy)
 
         # Raw update 2: Add off-history reward to offset
         # The measure evaluation includes the offset, so we do an assignment here, rather than an addition

@@ -46,15 +46,11 @@ class WorldModel(ABC):
 
     @abstractmethod
     def update_state(self, state, outcome: Outcome, action: int,
-                     policy: np.ndarray, params=None):
+                     policy: np.ndarray):
         """
         Return new belief state after observing outcome under agent action.
         Does not mutate state.
         Policy needed by policy-dependent models (ignored by Bernoulli).
-        params: hypothesis params for the a-measure being updated; required
-            by stateful world models that need transition information to
-            propagate the belief. Ignored by stateless world models
-            (Bernoulli, Newcomb).
         """
         pass
 

@@ -100,7 +100,6 @@ class JointBanditWorldModel(WorldModel):
         outcome: Outcome,
         action: int,
         policy: np.ndarray,
-        params=None,
     ) -> JointBanditBeliefState:
         history = state.history.copy()
         history[action, self.event_index(outcome, action)] += 1
