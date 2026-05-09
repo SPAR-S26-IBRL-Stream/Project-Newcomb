@@ -60,15 +60,9 @@ class InfraBayesianAgent(BaseGreedyAgent):
     def reset(self):
         super().reset()
         self.dist = Infradistribution.mix(self.hypotheses, self.prior)
-        self.action_counts = np.zeros(self.num_actions, dtype=np.int64)
-        self.reward_sums = np.zeros(self.num_actions)
-        self.empirical_values = np.zeros(self.num_actions)
 
     def update(self, probabilities: np.ndarray, action: int, outcome) -> None:
         super().update(probabilities, action, outcome)
-        self.action_counts[action] += 1
-        self.reward_sums[action] += outcome.reward
-        self.empirical_values[action] = self.reward_sums[action] / self.action_counts[action]
         self.dist.update(self.reward_function, outcome, action, probabilities)
 
     def get_probabilities(self) -> np.ndarray:

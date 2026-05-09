@@ -80,7 +80,7 @@ class MultiBernoulliWorldModel(WorldModel):
             mixed.coefficients.append(mixed_coefficients)
         return mixed
 
-    def event_index(self, outcome: Outcome, action : int) -> int:
+    def event_index(self, outcome: Outcome, action: int) -> int:
         # For Bernoulli bandits reward is the event type, so this mapping is exact.
         return int(round(outcome.reward * (self.num_outcomes - 1)))
 

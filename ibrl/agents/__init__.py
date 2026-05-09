@@ -12,12 +12,10 @@ from .infrabayesian import InfraBayesianAgent
 from ..exploration import (
     BayesianUCB,
     EpsilonGreedy,
-    EmpiricalUCB,
     ExplorationStrategy,
     Greedy,
     HypothesisThompsonSampling,
     ThompsonSampling,
-    UCB,
     UniformPrefixThen,
 )
 
@@ -35,11 +33,9 @@ __all__ = [
     "InfraBayesianAgent",
     "BayesianUCB",
     "EpsilonGreedy",
-    "EmpiricalUCB",
     "ExplorationStrategy",
     "Greedy",
     "HypothesisThompsonSampling",
     "ThompsonSampling",
-    "UCB",
     "UniformPrefixThen",
 ]

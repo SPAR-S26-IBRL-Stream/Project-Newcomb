@@ -51,23 +51,6 @@ class UniformPrefixThen(ExplorationStrategy):
         return self.base_strategy.get_probabilities(agent, values)
 
 
-class EmpiricalUCB(ExplorationStrategy):
-    """Empirical UCB over realized scalar rewards."""
-
-    def __init__(self, c: float = 2.0):
-        self.c = c
-
-    def get_probabilities(self, agent, values: np.ndarray) -> np.ndarray:
-        unpulled = agent.action_counts == 0
-        if unpulled.any():
-            return unpulled.astype(float) / unpulled.sum()
-        total = max(agent.step, 2)
-        bonus = self.c * np.sqrt(np.log(total) / agent.action_counts)
-        scores = agent.empirical_values + bonus
-        best = np.isclose(scores, scores.max())
-        return best.astype(float) / best.sum()
-
-
 class BayesianUCB(ExplorationStrategy):
     """Posterior action-value quantile UCB for Bayesian component mixtures."""
 
@@ -107,4 +90,3 @@ class HypothesisThompsonSampling(ExplorationStrategy):
 
 # Backwards-compatible alias for the original export name.
 ThompsonSampling = HypothesisThompsonSampling
-UCB = EmpiricalUCB
