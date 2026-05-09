@@ -114,7 +114,7 @@ class SupraPOMDPWorldModel(WorldModel):
         """
         raise NotImplementedError
 
-    # ── Planning (multi-step, used by SupraPOMDPAgent._expected_rewards) ─────
+    # ── Planning (multi-step) ───────────────────────────────────────────────
 
     def compute_q_values(self, belief_state, params,
                          policy: np.ndarray | None = None) -> np.ndarray:
