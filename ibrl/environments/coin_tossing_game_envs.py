@@ -5,12 +5,12 @@ from . import BaseNewcombLikeEnvironment
 class MatchEnvironment(BaseNewcombLikeEnvironment):
     # First environment: reward 1 if action matches observation, 0 otherwise
     # 0 = H, 1 = T
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         reward_table = [
             [1.0, 0.0],  # if observation is H
             [0.0, 1.0],  # if observation is T
         ]
-        super().__init__(*args, reward_table=reward_table, **kwargs)
+        super().__init__(reward_table=reward_table, **kwargs)
 
 
 class ReverseTailsEnvironment(BaseNewcombLikeEnvironment):
@@ -18,9 +18,9 @@ class ReverseTailsEnvironment(BaseNewcombLikeEnvironment):
     # if H: reward 1 for mismatch, 0 for match
     # if T: reward always 0.5
     # 0 = H, 1 = T
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         reward_table = [
             [0.0, 1.0],  # if observation is H
             [0.5, 0.5],  # if observation is T
         ]
-        super().__init__(*args, reward_table=reward_table, **kwargs)
+        super().__init__(reward_table=reward_table, **kwargs)
