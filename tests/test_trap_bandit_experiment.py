@@ -14,7 +14,6 @@ from experiments.alaro.trap_bandit.run import (
     TrapBanditConfig,
     bootstrap_final_regret_percentile_cis,
     get_conditions,
-    sample_action_from_uniform,
     sample_world,
 )
 
@@ -39,12 +38,6 @@ def test_greedy_tie_breaks_uniformly():
         num_actions = 2
     probs = strategy.get_probabilities(Agent(), np.array([1.0, 1.0]))
     np.testing.assert_allclose(probs, [0.5, 0.5])
-
-
-def test_sample_action_from_uniform_reuses_common_draw():
-    assert sample_action_from_uniform(np.array([0.5, 0.5]), 0.25) == 0
-    assert sample_action_from_uniform(np.array([0.5, 0.5]), 0.75) == 1
-    assert sample_action_from_uniform(np.array([0.2, 0.8]), 0.25) == 1
 
 
 def test_bootstrap_final_regret_percentile_cis_shapes():
