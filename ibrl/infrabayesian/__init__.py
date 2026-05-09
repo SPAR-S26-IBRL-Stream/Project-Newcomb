@@ -9,7 +9,6 @@ from .world_models.joint_bandit_world_model import (
     JointBanditWorldModelParameters,
 )
 from .world_models.newcomb_world_model import NewcombWorldModel
-from .world_models.supra_pomdp_world_model import SupraPOMDPWorldModel
 
 __all__ = [
     "AMeasure",
@@ -21,5 +20,4 @@ __all__ = [
     "JointBanditWorldModel",
     "JointBanditWorldModelParameters",
     "NewcombWorldModel",
-    "SupraPOMDPWorldModel",
 ]

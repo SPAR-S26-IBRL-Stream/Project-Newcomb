@@ -52,9 +52,9 @@ class WorldModel(ABC):
         Does not mutate state.
         Policy needed by policy-dependent models (ignored by Bernoulli).
         params: hypothesis params for the a-measure being updated; required
-            by stateful world models (e.g. SupraPOMDPWorldModel) that need
-            POMDP kernel matrices to propagate the belief. Ignored by
-            stateless world models (Bernoulli, Newcomb).
+            by stateful world models that need transition information to
+            propagate the belief. Ignored by stateless world models
+            (Bernoulli, Newcomb).
         """
         pass
 
