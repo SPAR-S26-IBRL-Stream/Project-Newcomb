@@ -11,5 +11,5 @@ class Outcome:
                      prediction, or a POMDP observation index). None for
                      environments with no separate observation channel.
     """
-    reward: float
+    reward: float | None = None
     observation: int | None = None
