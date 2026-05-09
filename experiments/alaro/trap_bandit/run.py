@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import replace
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
@@ -229,21 +228,6 @@ def _stack_runs(runs: list[dict]) -> dict:
     }
 
 
-def _unstack_runs(stacked: dict) -> list[dict]:
-    return [
-        {
-            "rewards": stacked["rewards"][i],
-            "actions": stacked["actions"][i],
-            "catastrophes": stacked["catastrophes"][i],
-            "trapped_pulls": stacked["trapped_pulls"][i],
-            "expected_regret": stacked["expected_regret"][i],
-            "cumulative_expected_regret": stacked["cumulative_expected_regret"][i],
-            "risky": bool(stacked["risky"][i]),
-        }
-        for i in range(stacked["rewards"].shape[0])
-    ]
-
-
 def run_condition(
     alpha_prior: tuple[float, float],
     config: TrapBanditConfig,
@@ -277,10 +261,6 @@ def run_condition(
                 )
             )
     return results
-
-
-def summarize_stacked(results: dict[str, dict]) -> dict:
-    return summarize({kind: _unstack_runs(stacked) for kind, stacked in results.items()})
 
 
 def bootstrap_final_regret_percentile_cis(
@@ -401,11 +381,6 @@ def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
         "kinds": kinds,
         "conditions": _json_conditions(get_conditions(config)),
     }
-
-
-def config_hash(payload: dict) -> str:
-    encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()[:16]
 
 
 def save_summary(summary: dict, output_path: Path) -> None:
@@ -566,42 +541,11 @@ def build_markdown_table(results_dir: Path) -> str:
     return "\n".join(lines)
 
 
-def raw_cache_path(output_dir: Path, condition_name: str) -> Path:
-    return output_dir / f"{condition_name}_raw.npz"
-
-
-def save_raw_results(output_path: Path, condition_results: dict[str, list[dict]]) -> None:
-    payload = {}
-    for kind, runs in condition_results.items():
-        stacked = _stack_runs(runs)
-        for key, value in stacked.items():
-            payload[f"{kind}__{key}"] = value
-    np.savez_compressed(output_path, **payload)
-
-
-def load_raw_results(input_path: Path, kinds: list[str]) -> dict[str, dict]:
-    data = np.load(input_path)
-    results = {}
-    keys = [
-        "rewards",
-        "actions",
-        "catastrophes",
-        "trapped_pulls",
-        "expected_regret",
-        "cumulative_expected_regret",
-        "risky",
-    ]
-    for kind in kinds:
-        results[kind] = {key: data[f"{kind}__{key}"] for key in keys}
-    return results
-
-
 def run_and_save(
     *,
     config: TrapBanditConfig,
     output_dir: Path,
     kinds: list[str] | None = None,
-    force: bool = False,
     bootstrap_samples: int = 0,
     bootstrap_seed: int = 0,
 ) -> dict:
@@ -610,34 +554,21 @@ def run_and_save(
         kinds = DEFAULT_KINDS
     conditions = get_conditions(config)
     payload = config_payload(config, kinds)
-    payload["config_hash"] = config_hash(payload)
     config_path = output_dir / "config.json"
-    cache_matches = False
-    if config_path.exists():
-        try:
-            cache_matches = json.loads(config_path.read_text()) == payload
-        except json.JSONDecodeError:
-            cache_matches = False
 
     summaries = {}
     for name, condition in conditions.items():
-        cache_path = raw_cache_path(output_dir, name)
-        if cache_matches and cache_path.exists() and not force:
-            stacked = load_raw_results(cache_path, kinds)
-            summary = summarize_stacked(stacked)
-        else:
-            condition_results = run_condition(
-                condition["prior"],
-                config,
-                kinds=kinds,
-                alpha_dgp=condition["dgp"],
-            )
-            save_raw_results(cache_path, condition_results)
-            summary = summarize(condition_results)
-            stacked = {
-                kind: _stack_runs(runs)
-                for kind, runs in condition_results.items()
-            }
+        condition_results = run_condition(
+            condition["prior"],
+            config,
+            kinds=kinds,
+            alpha_dgp=condition["dgp"],
+        )
+        summary = summarize(condition_results)
+        stacked = {
+            kind: _stack_runs(runs)
+            for kind, runs in condition_results.items()
+        }
         summaries[name] = summary
         save_summary(summary, output_dir / f"{name}_summary.json")
         if bootstrap_samples > 0:
@@ -710,7 +641,6 @@ def parse_args():
     parser.add_argument("--p-low", type=float, default=0.3)
     parser.add_argument("--p-high", type=float, default=0.7)
     parser.add_argument("--output-dir", type=Path, default=Path("experiments/alaro/trap_bandit/results"))
-    parser.add_argument("--force", action="store_true")
     parser.add_argument("--bootstrap-samples", type=int, default=0)
     parser.add_argument("--bootstrap-seed", type=int, default=0)
     parser.add_argument(
@@ -739,7 +669,6 @@ if __name__ == "__main__":
         config=cfg,
         output_dir=args.output_dir,
         kinds=args.kinds,
-        force=args.force,
         bootstrap_samples=args.bootstrap_samples,
         bootstrap_seed=args.bootstrap_seed,
     )
