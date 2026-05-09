@@ -1,6 +1,7 @@
 import numpy as np
 
 from . import BaseEnvironment
+from ..outcome import Outcome
 
 
 class BernoulliBanditEnvironment(BaseEnvironment):
@@ -16,11 +17,9 @@ class BernoulliBanditEnvironment(BaseEnvironment):
         super().__init__(**kwargs)
         self._fixed_probs = np.array(probs, dtype=float) if probs is not None else None
 
-    def _respond(self, probabilities: np.ndarray, action: int) -> int:
-        return int(self.random.random() < self.probs[action])
-
-    def _resolve(self, observation: int, action: int) -> float:
-        return float(observation)
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
+        observation = int(self.random.random() < self.probs[action])
+        return Outcome(reward=float(observation), observation=observation)
 
     def get_optimal_reward(self) -> float:
         return self.probs.max()

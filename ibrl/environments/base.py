@@ -34,41 +34,27 @@ class BaseEnvironment(ABC):
         self.seed = seed
         self.verbose = verbose
 
+    @abstractmethod
     def step(self, probabilities : np.ndarray, action : int) -> Outcome:
-        """Public environment interaction method.
+        """Execute one round of interaction.
 
-        The template is:
-        1. sample a discrete observation/event index, if the environment has one;
-        2. resolve the scalar reward from that observation and the selected action;
-        3. package both into Outcome.
+        For standard bandits, this just samples an observation/reward based on the action
+        For Newcomb-like environments, there are two-steps:
+        - Respond to the agent's policy (e.g. the predictor samples a prediction)
+        - Resolve the payoff given the agent's action
 
         Arguments:
             probabilities: The agent's policy (probability distribution over actions)
             action:        The action sampled from the policy
 
         Returns:
-            Outcome containing the scalar reward and a discrete observation index,
-            or observation=None when the environment has no separate finite
-            observation channel.
+            Outcome containing:
+                the obtained reward (float)
+                a discrete observation (int)
         """
-        observation = self._respond(probabilities, action)
+        observation = self._respond(probabilities)
         reward = self._resolve(observation, action)
         return Outcome(reward=reward, observation=observation)
-
-    def _respond(self, probabilities : np.ndarray, action : int) -> int | None:
-        """Sample the environment's discrete observation/event index.
-
-        For Newcomb-like environments, this may depend on the full agent policy.
-        For observed bandits, this may depend on the selected action. For
-        unobserved continuous-reward bandits, return None.
-        """
-        return None
-
-    @abstractmethod
-    def _resolve(self, observation : int | None, action : int) -> float:
-        """Return the scalar reward for an observation/action pair.
-        """
-        pass
 
     @abstractmethod
     def get_optimal_reward(self) -> float:

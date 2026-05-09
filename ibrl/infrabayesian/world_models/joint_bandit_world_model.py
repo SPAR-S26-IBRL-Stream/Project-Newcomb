@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .base import WorldModel
+from ..world_model import WorldModel
 from ...outcome import Outcome
 
 

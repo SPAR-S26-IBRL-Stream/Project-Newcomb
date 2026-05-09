@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass
 
-from .base import WorldModel
+from ..world_model import WorldModel
 from ...outcome import Outcome
 
 

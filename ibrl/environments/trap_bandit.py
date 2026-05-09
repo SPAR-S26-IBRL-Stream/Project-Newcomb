@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .base import BaseEnvironment
+from ..outcome import Outcome
 from ..infrabayesian.builders.trap_bandit import (
     OUTCOME_CATASTROPHE,
     OUTCOME_ONE,
@@ -30,13 +31,13 @@ class TrapBanditEnvironment(BaseEnvironment):
         self.catastrophe_reward = catastrophe_reward
         self.trapped_arm = 0 if p1 >= p2 else 1
 
-    def _respond(self, probabilities, action: int) -> int:
-        return self._sample_outcome(action)
-
-    def _resolve(self, observation, action):
+    def step(self, probabilities, action: int) -> Outcome:
+        observation = self._sample_outcome(action)
         if observation == OUTCOME_CATASTROPHE:
-            return self.catastrophe_reward
-        return float(observation == OUTCOME_ONE)
+            reward = self.catastrophe_reward
+        else:
+            reward = float(observation == OUTCOME_ONE)
+        return Outcome(reward=reward, observation=observation)
 
     def _sample_outcome(self, action: int) -> int:
         p = self.p1 if action == 0 else self.p2
