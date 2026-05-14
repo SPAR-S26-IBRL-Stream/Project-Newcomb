@@ -121,10 +121,11 @@ def make_bayesian_hypothesis(
     safe: Infradistribution,
     risky: Infradistribution,
     *,
-    alpha_beta: tuple[float, float] = (2.0, 2.0),
+    p_risky: float = 0.5,
 ) -> Infradistribution:
-    a, b = alpha_beta
-    p_risky = a / (a + b)
+    """Build a precise safe-vs-risky mixture with point prior P(risky)."""
+    if not 0.0 <= p_risky <= 1.0:
+        raise ValueError(f"p_risky must be in [0, 1], got {p_risky}")
     return Infradistribution.mix([safe, risky], np.array([1.0 - p_risky, p_risky]))
 
 

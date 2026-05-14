@@ -129,7 +129,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
             raise RuntimeError(
                 "Bayesian posterior component exploration requires a single "
                 "Bayesian mixture measure."
-        )
+            )
         measure = self.dist.measures[0]
         world_model = self.dist.world_model
         params = measure.params

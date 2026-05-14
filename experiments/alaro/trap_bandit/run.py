@@ -20,7 +20,12 @@ from ibrl.infrabayesian.builders.trap_bandit import (
     make_trap_bandit_hypotheses,
 )
 
-from .plot import plot_condition_grid, plot_log_regret, plot_percentile_band
+from .plot import (
+    AGENT_LABELS,
+    plot_condition_grid,
+    plot_log_regret,
+    plot_percentile_band,
+)
 
 
 REWARD_FUNCTION = np.array([
@@ -30,14 +35,9 @@ REWARD_FUNCTION = np.array([
 
 CONDITION_LABELS = {
     "correct": "Correctly specified prior",
+    "misspecified": "Misspecified prior",
     "severely_misspecified": "Severely misspecified prior",
-}
-
-AGENT_LABELS = {
-    "ib": "Infra-Bayesian",
-    "bayes_greedy": "Bayesian Greedy",
-    "bayes_thompson": "Bayesian Thompson Sampling",
-    "bayes_ucb": "Bayesian UCB",
+    "mostly_safe_correct": "Mostly-safe correctly specified prior",
 }
 
 AGENT_COLORS = {
@@ -80,15 +80,15 @@ DEFAULT_KINDS = [
 
 @dataclass
 class TrapBanditConfig:
-    num_worlds: int = 100
-    num_steps: int = 1000
-    num_grid: int = 19
+    num_worlds: int = 200
+    num_steps: int = 100
+    num_grid: int = 7
     p_cat: float = 0.01
     seed: int = 123
     alpha_dgp: tuple[float, float] = (2.0, 2.0)
     p_beta: tuple[float, float] = (2.0, 2.0)
-    condition_preset: str = "baseline"
-    p_mode: str = "beta"
+    condition_preset: str = "mostly_risky"
+    p_mode: str = "separated"
     p_low: float = 0.3
     p_high: float = 0.7
 
@@ -109,7 +109,7 @@ def p_pair_hypothesis_kwargs(config: TrapBanditConfig) -> dict:
 
 def make_agent(
     kind: str,
-    alpha_prior: tuple[float, float],
+    p_risky_prior: float,
     config: TrapBanditConfig,
     *,
     safe=None,
@@ -126,7 +126,7 @@ def make_agent(
         hypothesis = make_ib_hypothesis(safe, risky)
         strategy = None
     else:
-        hypothesis = make_bayesian_hypothesis(safe, risky, alpha_beta=alpha_prior)
+        hypothesis = make_bayesian_hypothesis(safe, risky, p_risky=p_risky_prior)
         if kind == "bayes_greedy":
             strategy = Greedy()
         elif kind == "bayes_thompson":
@@ -181,6 +181,7 @@ def run_agent_on_world(
         seed=seed,
     )
     env.reset()
+    # BaseAgent.reset() re-seeds from self.seed, so assign the per-world seed first.
     agent.seed = seed + 10_000
     agent.reset()
 
@@ -229,7 +230,7 @@ def _stack_runs(runs: list[dict]) -> dict:
 
 
 def run_condition(
-    alpha_prior: tuple[float, float],
+    p_risky_prior: float,
     config: TrapBanditConfig,
     *,
     kinds: list[str] | None = None,
@@ -251,7 +252,7 @@ def run_condition(
     for world_idx in range(config.num_worlds):
         world = sample_world(rng, config)
         for kind in kinds:
-            agent = make_agent(kind, alpha_prior, config, safe=safe, risky=risky)
+            agent = make_agent(kind, p_risky_prior, config, safe=safe, risky=risky)
             results[kind].append(
                 run_agent_on_world(
                     agent,
@@ -313,6 +314,8 @@ def summarize(results: dict) -> dict:
 def summarize_group(runs: list[dict], mask: np.ndarray) -> dict:
     selected = [run for run, include in zip(runs, mask) if include]
     if not selected:
+        if not runs:
+            raise ValueError("summarize_group requires at least one run")
         num_steps = len(runs[0]["cumulative_expected_regret"])
         nan = np.full((3, num_steps), np.nan)
         return {"regret_p5_p50_p95": nan, "trapped_p5_p50_p95": nan}
@@ -327,38 +330,37 @@ def summarize_group(runs: list[dict], mask: np.ndarray) -> dict:
     }
 
 
-def get_conditions(config: TrapBanditConfig) -> dict[str, dict[str, tuple[float, float]]]:
+def get_conditions(config: TrapBanditConfig) -> dict[str, dict[str, float | tuple[float, float]]]:
     if config.condition_preset == "baseline":
         return {
-            "correct": {"prior": (2.0, 2.0), "dgp": config.alpha_dgp},
-            "misspecified": {"prior": (2.0, 5.0), "dgp": config.alpha_dgp},
-            "severely_misspecified": {"prior": (1.0, 99.0), "dgp": config.alpha_dgp},
-            "severely_pessimistic": {"prior": (99.0, 1.0), "dgp": config.alpha_dgp},
-            "mostly_safe_correct": {"prior": (1.0, 99.0), "dgp": (1.0, 99.0)},
+            "correct": {"prior": 0.5, "dgp": config.alpha_dgp},
+            "misspecified": {"prior": 2.0 / 7.0, "dgp": config.alpha_dgp},
+            "severely_misspecified": {"prior": 0.01, "dgp": config.alpha_dgp},
+            "mostly_safe_correct": {"prior": 0.01, "dgp": (1.0, 99.0)},
         }
     if config.condition_preset == "mostly_risky":
         return {
-            "correct": {"prior": (99.0, 1.0), "dgp": (99.0, 1.0)},
-            "misspecified": {"prior": (1.0, 1.0), "dgp": (99.0, 1.0)},
-            "severely_misspecified": {"prior": (1.0, 99.0), "dgp": (99.0, 1.0)},
-            "mostly_safe_correct": {"prior": (1.0, 99.0), "dgp": (1.0, 99.0)},
+            "correct": {"prior": 0.99, "dgp": (99.0, 1.0)},
+            "misspecified": {"prior": 0.5, "dgp": (99.0, 1.0)},
+            "severely_misspecified": {"prior": 0.01, "dgp": (99.0, 1.0)},
+            "mostly_safe_correct": {"prior": 0.01, "dgp": (1.0, 99.0)},
         }
     if config.condition_preset == "risky_80":
         return {
-            "correct": {"prior": (4.0, 1.0), "dgp": (4.0, 1.0)},
-            "misspecified": {"prior": (1.0, 1.0), "dgp": (4.0, 1.0)},
-            "severely_misspecified": {"prior": (1.0, 4.0), "dgp": (4.0, 1.0)},
-            "mostly_safe_correct": {"prior": (1.0, 4.0), "dgp": (1.0, 4.0)},
+            "correct": {"prior": 0.8, "dgp": (4.0, 1.0)},
+            "misspecified": {"prior": 0.5, "dgp": (4.0, 1.0)},
+            "severely_misspecified": {"prior": 0.2, "dgp": (4.0, 1.0)},
+            "mostly_safe_correct": {"prior": 0.2, "dgp": (1.0, 4.0)},
         }
     raise ValueError(f"unknown condition preset {config.condition_preset}")
 
 
 def _json_conditions(
-    conditions: dict[str, dict[str, tuple[float, float]]],
-) -> dict[str, dict[str, list[float]]]:
+    conditions: dict[str, dict[str, float | tuple[float, float]]],
+) -> dict[str, dict[str, float | list[float]]]:
     return {
         name: {
-            key: list(value)
+            key: list(value) if isinstance(value, tuple) else value
             for key, value in condition.items()
         }
         for name, condition in conditions.items()
@@ -613,15 +615,15 @@ def run_and_save(
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num-worlds", type=int, default=40)
-    parser.add_argument("--num-steps", type=int, default=300)
-    parser.add_argument("--num-grid", type=int, default=9)
+    parser.add_argument("--num-worlds", type=int, default=200)
+    parser.add_argument("--num-steps", type=int, default=100)
+    parser.add_argument("--num-grid", type=int, default=7)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--p-cat", type=float, default=0.01)
     parser.add_argument(
         "--condition-preset",
         choices=["baseline", "mostly_risky", "risky_80"],
-        default="baseline",
+        default="mostly_risky",
         help="Condition suite to run.",
     )
     parser.add_argument(
@@ -635,14 +637,23 @@ def parse_args():
     parser.add_argument(
         "--p-mode",
         choices=["beta", "separated"],
-        default="beta",
+        default="separated",
         help="How to generate and hypothesize arm reward probabilities.",
     )
     parser.add_argument("--p-low", type=float, default=0.3)
     parser.add_argument("--p-high", type=float, default=0.7)
-    parser.add_argument("--output-dir", type=Path, default=Path("experiments/alaro/trap_bandit/results"))
-    parser.add_argument("--bootstrap-samples", type=int, default=0)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("experiments/alaro/trap_bandit/results_separated_arms_200_pcat001"),
+    )
+    parser.add_argument("--bootstrap-samples", type=int, default=5000)
     parser.add_argument("--bootstrap-seed", type=int, default=0)
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Accepted for documented reruns; existing output files are overwritten.",
+    )
     parser.add_argument(
         "--kinds",
         nargs="*",

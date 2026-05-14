@@ -157,7 +157,9 @@ class JointBanditWorldModel(WorldModel):
         predictive = np.zeros(self.num_outcomes)
         for weight, component in zip(weights, params.components):
             predictive += weight * self.component_outcome_probs(component, action)
-        return predictive / predictive.sum()
+        if __debug__:
+            np.testing.assert_allclose(predictive.sum(), 1.0, rtol=1e-5, atol=1e-8)
+        return predictive
 
     def get_component_expected_rewards(
         self,

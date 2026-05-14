@@ -14,7 +14,10 @@ from experiments.alaro.trap_bandit.run import (
     TrapBanditConfig,
     bootstrap_final_regret_percentile_cis,
     get_conditions,
+    parse_args,
+    run_condition,
     sample_world,
+    summarize,
 )
 
 
@@ -86,6 +89,42 @@ def test_separated_p_mode_samples_only_low_high_assignments():
     assert {sample["p1"] for sample in samples} == {0.3, 0.7}
 
 
+def test_cli_defaults_match_published_results_config(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["run.py"])
+
+    args = parse_args()
+
+    assert args.num_worlds == 200
+    assert args.num_steps == 100
+    assert args.num_grid == 7
+    assert args.p_cat == 0.01
+    assert args.condition_preset == "mostly_risky"
+    assert args.p_mode == "separated"
+    assert args.p_low == 0.3
+    assert args.p_high == 0.7
+    assert args.bootstrap_samples == 5000
+    assert args.output_dir.name == "results_separated_arms_200_pcat001"
+
+
+def test_baseline_condition_preset_uses_requested_priors():
+    config = TrapBanditConfig(condition_preset="baseline")
+
+    conditions = get_conditions(config)
+
+    assert list(conditions) == [
+        "correct",
+        "misspecified",
+        "severely_misspecified",
+        "mostly_safe_correct",
+    ]
+    assert conditions["correct"] == {"prior": 0.5, "dgp": config.alpha_dgp}
+    assert conditions["misspecified"] == {"prior": 2.0 / 7.0, "dgp": config.alpha_dgp}
+    assert conditions["severely_misspecified"] == {
+        "prior": 0.01,
+        "dgp": config.alpha_dgp,
+    }
+
+
 def test_mostly_risky_condition_preset_uses_requested_priors():
     config = TrapBanditConfig(condition_preset="mostly_risky")
 
@@ -97,14 +136,14 @@ def test_mostly_risky_condition_preset_uses_requested_priors():
         "severely_misspecified",
         "mostly_safe_correct",
     ]
-    assert conditions["correct"] == {"prior": (99.0, 1.0), "dgp": (99.0, 1.0)}
-    assert conditions["misspecified"] == {"prior": (1.0, 1.0), "dgp": (99.0, 1.0)}
+    assert conditions["correct"] == {"prior": 0.99, "dgp": (99.0, 1.0)}
+    assert conditions["misspecified"] == {"prior": 0.5, "dgp": (99.0, 1.0)}
     assert conditions["severely_misspecified"] == {
-        "prior": (1.0, 99.0),
+        "prior": 0.01,
         "dgp": (99.0, 1.0),
     }
     assert conditions["mostly_safe_correct"] == {
-        "prior": (1.0, 99.0),
+        "prior": 0.01,
         "dgp": (1.0, 99.0),
     }
 
@@ -114,21 +153,41 @@ def test_risky_80_condition_preset_uses_requested_priors():
 
     conditions = get_conditions(config)
 
-    assert conditions["correct"] == {"prior": (4.0, 1.0), "dgp": (4.0, 1.0)}
-    assert conditions["misspecified"] == {"prior": (1.0, 1.0), "dgp": (4.0, 1.0)}
+    assert conditions["correct"] == {"prior": 0.8, "dgp": (4.0, 1.0)}
+    assert conditions["misspecified"] == {"prior": 0.5, "dgp": (4.0, 1.0)}
     assert conditions["severely_misspecified"] == {
-        "prior": (1.0, 4.0),
+        "prior": 0.2,
         "dgp": (4.0, 1.0),
     }
     assert conditions["mostly_safe_correct"] == {
-        "prior": (1.0, 4.0),
+        "prior": 0.2,
         "dgp": (1.0, 4.0),
     }
 
 
+def test_run_condition_tiny_config_end_to_end():
+    config = TrapBanditConfig(
+        num_worlds=2,
+        num_steps=10,
+        num_grid=3,
+        p_mode="separated",
+        p_low=0.3,
+        p_high=0.7,
+    )
+
+    results = run_condition(0.5, config, kinds=["bayes_greedy", "ib"])
+    summary = summarize(results)
+
+    assert set(results) == {"bayes_greedy", "ib"}
+    assert all(len(runs) == 2 for runs in results.values())
+    for kind in results:
+        assert len(results[kind][0]["cumulative_expected_regret"]) == 10
+        assert summary[kind]["all"]["regret_p5_p50_p95"].shape == (3, 10)
+
+
 def test_bayesian_ucb_returns_valid_policy():
     _wm, safe, risky = make_trap_bandit_hypotheses(num_grid=3, p_cat=0.01)
-    bayes_h = make_bayesian_hypothesis(safe, risky, alpha_beta=(2.0, 2.0))
+    bayes_h = make_bayesian_hypothesis(safe, risky, p_risky=0.5)
     agent = InfraBayesianAgent(
         num_actions=2,
         hypotheses=[bayes_h],
@@ -145,7 +204,7 @@ def test_bayesian_ucb_returns_valid_policy():
 
 def test_trap_bandit_hypothesis_builders_construct_agents():
     _wm, safe, risky = make_trap_bandit_hypotheses(num_grid=3, p_cat=0.01)
-    bayes_h = make_bayesian_hypothesis(safe, risky, alpha_beta=(2.0, 2.0))
+    bayes_h = make_bayesian_hypothesis(safe, risky, p_risky=0.5)
     ib_h = make_ib_hypothesis(safe, risky)
 
     bayes = InfraBayesianAgent(
@@ -192,7 +251,7 @@ def test_trap_bandit_hypothesis_builder_accepts_separated_pairs():
 
 def test_thompson_sampling_returns_valid_policy():
     _wm, safe, risky = make_trap_bandit_hypotheses(num_grid=3, p_cat=0.01)
-    bayes_h = make_bayesian_hypothesis(safe, risky, alpha_beta=(2.0, 2.0))
+    bayes_h = make_bayesian_hypothesis(safe, risky, p_risky=0.5)
     agent = InfraBayesianAgent(
         num_actions=2,
         hypotheses=[bayes_h],
