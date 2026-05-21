@@ -421,17 +421,17 @@ def plot_risky_condition_grid(
     conditions: list[str],
     agents: list[str],
 ) -> None:
-    fig, axes = plt.subplots(len(conditions), 2, figsize=(9, 6), sharex=True)
+    fig, axes = plt.subplots(2, len(conditions), figsize=(9, 6), sharex=True)
     if len(conditions) == 1:
-        axes = np.asarray([axes])
+        axes = np.asarray(axes).reshape(2, 1)
 
-    for row, condition in enumerate(conditions):
+    for col, condition in enumerate(conditions):
         summary = load_summary(results_dir, condition)
-        ax_regret = axes[row, 0]
-        ax_trapped = axes[row, 1]
+        ax_regret = axes[0, col]
+        ax_trapped = axes[1, col]
 
         for agent in agents:
-            group = summary[agent]["risky"]
+            group = summary[agent]["all"]
             p5, p50, p95 = np.asarray(group["regret_p5_p50_p95"])
             steps = np.arange(len(p50))
             label = AGENT_LABELS.get(agent, agent)
@@ -456,14 +456,14 @@ def plot_risky_condition_grid(
             )
             ax_trapped.fill_between(steps, p5, p95, alpha=0.12, color=color)
 
-        ax_regret.set_ylabel(CONDITION_LABELS.get(condition, condition))
-        ax_regret.set_title("Cumulative expected regret" if row == 0 else "")
-        ax_trapped.set_title("Risky arm pull rate" if row == 0 else "")
+        ax_regret.set_title(CONDITION_LABELS.get(condition, condition))
         ax_trapped.set_ylim(-0.02, 1.02)
 
-    axes[-1, 0].set_xlabel("step")
-    axes[-1, 1].set_xlabel("step")
-    axes[0, 1].legend(loc="upper right", fontsize=8)
+    axes[0, 0].set_ylabel("Cumulative expected regret")
+    axes[1, 0].set_ylabel("Risky arm pull rate")
+    for ax in axes[-1, :]:
+        ax.set_xlabel("step")
+    axes[0, -1].legend(loc="upper right", fontsize=8)
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
     plt.close(fig)
