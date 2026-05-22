@@ -111,33 +111,22 @@ class InfraBayesianAgent(BaseGreedyAgent):
 
     def sample_component_from_posterior(self):
         """Sample one complete component from a world model posterior mixture."""
-        if len(self.dist.measures) != 1:
-            raise RuntimeError(
-                "HypothesisThompsonSampling requires a single Bayesian mixture "
-                "measure; KU/multi-measure infradistributions are not supported. "
-            )
-        measure = self.dist.measures[0]
+        params = self._component_mixture_params(
+            "HypothesisThompsonSampling requires a single Bayesian mixture "
+            "measure; KU/multi-measure infradistributions are not supported. "
+        )
         world_model = self.dist.world_model
-        params = measure.params
         weights = world_model.get_posterior_component_weights(self.dist.belief_state, params)
         idx = int(self.random.choice(len(params.components), p=weights))
         return params.components[idx]
 
     def posterior_component_action_values(self) -> tuple[np.ndarray, np.ndarray]:
         """Return component action values and posterior weights for one Bayesian measure."""
-        if len(self.dist.measures) != 1:
-            raise RuntimeError(
-                "Bayesian posterior component exploration requires a single "
-                "Bayesian mixture measure."
-            )
-        measure = self.dist.measures[0]
+        params = self._component_mixture_params(
+            "Bayesian posterior component exploration requires a single "
+            "Bayesian mixture measure."
+        )
         world_model = self.dist.world_model
-        params = measure.params
-        if not hasattr(params, "components"):
-            raise RuntimeError(
-                "Bayesian posterior component exploration requires finite mixture "
-                "world-model parameters."
-            )
         weights = world_model.get_posterior_component_weights(self.dist.belief_state, params)
         component_values = np.array([
             world_model.get_component_expected_rewards(component, self.reward_function)
@@ -146,7 +135,23 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return component_values, weights
 
     def values_for_component(self, component) -> np.ndarray:
+        self._component_mixture_params(
+            "Bayesian posterior component exploration requires a single "
+            "Bayesian mixture measure."
+        )
         return self.dist.world_model.get_component_expected_rewards(component, self.reward_function)
+
+    def _component_mixture_params(self, multi_measure_message: str):
+        if len(self.dist.measures) != 1:
+            raise RuntimeError(multi_measure_message)
+        params = self.dist.measures[0].params
+        if not hasattr(params, "components"):
+            raise RuntimeError(
+                "Bayesian posterior component exploration requires finite "
+                "component-mixture world-model parameters with a components "
+                "attribute."
+            )
+        return params
 
     def _optimal_policy(self) -> np.ndarray:
         """Policy that maximises expected reward"""
