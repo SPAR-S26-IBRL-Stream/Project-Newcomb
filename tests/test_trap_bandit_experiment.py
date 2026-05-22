@@ -113,11 +113,16 @@ def test_baseline_condition_preset_uses_requested_priors():
 
     assert list(conditions) == [
         "correct",
+        "over_pessimistic",
         "misspecified",
         "severely_misspecified",
         "mostly_safe_correct",
     ]
     assert conditions["correct"] == {"prior": 0.5, "dgp": config.alpha_dgp}
+    assert conditions["over_pessimistic"] == {
+        "prior": 0.99,
+        "dgp": config.alpha_dgp,
+    }
     assert conditions["misspecified"] == {"prior": 2.0 / 7.0, "dgp": config.alpha_dgp}
     assert conditions["severely_misspecified"] == {
         "prior": 0.01,
@@ -135,6 +140,7 @@ def test_mostly_risky_condition_preset_uses_requested_priors():
         "misspecified",
         "severely_misspecified",
         "mostly_safe_correct",
+        "mostly_safe_severely_misspecified",
     ]
     assert conditions["correct"] == {"prior": 0.99, "dgp": (99.0, 1.0)}
     assert conditions["misspecified"] == {"prior": 0.5, "dgp": (99.0, 1.0)}
@@ -144,6 +150,10 @@ def test_mostly_risky_condition_preset_uses_requested_priors():
     }
     assert conditions["mostly_safe_correct"] == {
         "prior": 0.01,
+        "dgp": (1.0, 99.0),
+    }
+    assert conditions["mostly_safe_severely_misspecified"] == {
+        "prior": 0.99,
         "dgp": (1.0, 99.0),
     }
 
