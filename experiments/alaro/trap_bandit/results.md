@@ -39,6 +39,19 @@ uv run python -m experiments.alaro.trap_bandit.run \
 --bootstrap-samples 5000 \
 --output-dir experiments/alaro/trap_bandit/results_separated_arms_200_pcat001 \
 --force
+
+uv run python -m experiments.alaro.trap_bandit.run \
+--num-worlds 200 \
+--num-steps 100 \
+--num-grid 7 \
+--p-cat 0.01 \
+--condition-preset baseline \
+--p-mode separated \
+--p-low 0.3 \
+--p-high 0.7 \
+--bootstrap-samples 5000 \
+--output-dir experiments/alaro/trap_bandit/results_baseline_200_pcat001_overpessimistic \
+--force
 ```
 
 In the first experiment, the Bayesian point prior on `P(risky)` matches the data-generating process in expectation, and the agent's `p1,p2` prior matches the data-generating distribution. In the next experiments, we run misspecified point-prior conditions where Bayesian agents put too little probability on the risky world. Finally, in the mostly-safe experiment, we change the data-generating process to be mostly safe, such that the expected value maximizer would risk pulling the higher-reward arm. The infra-Bayesian agent always shares the same classical `p1,p2` prior as the Bayesian agent but maintains Knightian uncertainty over whether the world is safe or risky.
@@ -95,6 +108,14 @@ Figure 2d. Mostly-safe correctly specified prior results.
 
 Here, the infra-bayesian agent can be seen to drastically underperform in cumulative regret because, of course, it is maintaining knightian uncertainty about the high reward arm being risky. In a very safe world, this will come at a signficant cost. Additionally, one might note that the scale of regret is significantly lower in the safe worlds. Even a large relative cost in regret for an infra-bayesian agent in a world that turns out to be safe might be a small price to pay for the security, especially if one really has no way of specifying a reasonable prior a priori.
 
+As an additional calibration check, we also run a balanced-risk DGP with `alpha_DGP ~ Beta(2,2)`, comparing calibrated Bayes against an over-pessimistic Bayesian prior `P(risky)=0.99`. This separates the benefit of robust safe/risky uncertainty from the simpler strategy of using a fixed highly pessimistic Bayesian prior.
+
+![Balanced-risk over-pessimistic prior grid](results_baseline_200_pcat001_overpessimistic/over_pessimistic_grid.png)
+
+Figure 2e. Balanced-risk DGP with over-pessimistic Bayes prior.
+
+In this balanced-risk setting, the greedy Bayesian agent with `P(risky)=0.99` behaves almost identically to the infra-bayesian agent, including the same catastrophe rate in this run (`0.005`) and the same final regret percentiles (`p50=38.8`, `p95=105.6`). Thus this ablation clarifies the mechanism: the mostly-risky experiment shows that IB is robust to underestimating risk, but the greedy-policy result alone does not distinguish IB from a sufficiently pessimistic fixed Bayesian prior.
+
 # Summary
 
 Across these experiments, infra-Bayes behaves conservatively in a way that protects it from not knowing whether the world is risky: when Bayes has a misspecified point prior that strongly underestimates risky worlds, greedy Bayes pulls the high-reward/high-risk arm more often and suffers worse regret, while IB's performance is stable. With a correct or mildly misspecified point prior, greedy Bayes and IB are broadly similar in worlds where it "pays" to pull the guaranteed-safe arm. The tradeoff is clear in the mostly-safe, correctly specified setting (ie where it "pays" to pull the risky arm): Bayes exploits the high-reward arm and achieves much lower regret, while IB remains cautious because the risky-world hypothesis is still live.
@@ -126,4 +147,4 @@ IB rows are not repeated across the three mostly-risky prior conditions because 
 
 ![Risky-world prior comparison](results_separated_arms_200_pcat001/risky_world_prior_comparison_grid.png)
 
-Figure 3. Risky-world comparison across Bayes priors. Rows are the correctly specified and severely misspecified Bayes prior conditions; columns are cumulative expected regret and high/trapped-arm pull rate. Each row compares Infra-Bayesian, Bayesian Greedy, Bayesian Thompson Sampling, and Bayesian UCB agents.
+Figure 3. Mostly-risky comparison across Bayes priors. Columns are the correctly specified and severely misspecified Bayes prior conditions; rows are cumulative expected regret and high/trapped-arm pull rate. Each column compares Infra-Bayesian, Bayesian Greedy, Bayesian Thompson Sampling, and Bayesian UCB agents over all sampled runs.

@@ -35,6 +35,7 @@ REWARD_FUNCTION = np.array([
 
 CONDITION_LABELS = {
     "correct": "Correctly specified prior",
+    "over_pessimistic": "Over-pessimistic prior",
     "misspecified": "Misspecified prior",
     "severely_misspecified": "Severely misspecified prior",
     "mostly_safe_correct": "Mostly-safe correctly specified prior",
@@ -334,6 +335,7 @@ def get_conditions(config: TrapBanditConfig) -> dict[str, dict[str, float | tupl
     if config.condition_preset == "baseline":
         return {
             "correct": {"prior": 0.5, "dgp": config.alpha_dgp},
+            "over_pessimistic": {"prior": 0.99, "dgp": config.alpha_dgp},
             "misspecified": {"prior": 2.0 / 7.0, "dgp": config.alpha_dgp},
             "severely_misspecified": {"prior": 0.01, "dgp": config.alpha_dgp},
             "mostly_safe_correct": {"prior": 0.01, "dgp": (1.0, 99.0)},
