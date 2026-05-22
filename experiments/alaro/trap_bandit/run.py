@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from dataclasses import replace
 import argparse
 import json
 from pathlib import Path
@@ -20,12 +19,6 @@ from ibrl.infrabayesian.builders.trap_bandit import (
     make_trap_bandit_hypotheses,
 )
 
-from .plot import (
-    AGENT_LABELS,
-    plot_condition_grid,
-    plot_log_regret,
-    plot_percentile_band,
-)
 
 
 REWARD_FUNCTION = np.array([
@@ -33,12 +26,12 @@ REWARD_FUNCTION = np.array([
     [0.0, 1.0, -1000.0],
 ])
 
-CONDITION_LABELS = {
-    "correct": "Correctly specified prior",
-    "over_pessimistic": "Over-pessimistic prior",
-    "misspecified": "Misspecified prior",
-    "severely_misspecified": "Severely misspecified prior",
-    "mostly_safe_correct": "Mostly-safe correctly specified prior",
+
+AGENT_LABELS = {
+    "ib": "Infra-Bayesian",
+    "bayes_greedy": "Bayesian Greedy",
+    "bayes_thompson": "Bayesian Thompson Sampling",
+    "bayes_ucb": "Bayesian UCB",
 }
 
 AGENT_COLORS = {
@@ -48,29 +41,6 @@ AGENT_COLORS = {
     "bayes_ucb": "tab:green",
 }
 
-RESULT_TABLE_ROWS = [
-    ("0.99", "n/a", r"infra\_bayesian", "correct", "ib"),
-    ("0.99", "0.99", r"bayes\_ucb", "correct", "bayes_ucb"),
-    ("0.99", "0.5", r"bayes\_ucb", "misspecified", "bayes_ucb"),
-    ("0.99", "0.01", r"bayes\_ucb", "severely_misspecified", "bayes_ucb"),
-    ("0.99", "0.99", r"bayes\_greedy", "correct", "bayes_greedy"),
-    ("0.99", "0.5", r"bayes\_greedy", "misspecified", "bayes_greedy"),
-    ("0.99", "0.01", r"bayes\_greedy", "severely_misspecified", "bayes_greedy"),
-    ("0.99", "0.99", r"bayes\_thompson", "correct", "bayes_thompson"),
-    ("0.99", "0.5", r"bayes\_thompson", "misspecified", "bayes_thompson"),
-    (
-        "0.99",
-        "0.01",
-        r"bayes\_thompson",
-        "severely_misspecified",
-        "bayes_thompson",
-    ),
-    ("0.01", "n/a", r"infra\_bayesian", "mostly_safe_correct", "ib"),
-    ("0.01", "0.01", r"bayes\_ucb", "mostly_safe_correct", "bayes_ucb"),
-    ("0.01", "0.01", r"bayes\_greedy", "mostly_safe_correct", "bayes_greedy"),
-    ("0.01", "0.01", r"bayes\_thompson", "mostly_safe_correct", "bayes_thompson"),
-]
-
 DEFAULT_KINDS = [
     "bayes_greedy",
     "bayes_thompson",
@@ -79,33 +49,110 @@ DEFAULT_KINDS = [
 ]
 
 
+@dataclass(frozen=True)
+class ReportCondition:
+    name: str
+    label: str
+    p_risky: float
+    p_risky_prior: float
+
+
+@dataclass(frozen=True)
+class ReportFigure:
+    name: str
+    output_name: str
+    conditions: tuple[ReportCondition, ReportCondition]
+    column_titles: tuple[str, str]
+
+
+REPORT_FIGURES = [
+    ReportFigure(
+        name="mostly_risky",
+        output_name="mostly_risky_prior_comparison_grid.png",
+        conditions=(
+            ReportCondition(
+                "mostly_risky_correct",
+                "Mostly-risky correctly specified prior",
+                p_risky=0.99,
+                p_risky_prior=0.99,
+            ),
+            ReportCondition(
+                "mostly_risky_severely_misspecified",
+                "Mostly-risky severely misspecified prior",
+                p_risky=0.99,
+                p_risky_prior=0.01,
+            ),
+        ),
+        column_titles=("Correctly specified prior", "Severely misspecified prior"),
+    ),
+    ReportFigure(
+        name="mostly_safe",
+        output_name="mostly_safe_prior_comparison_grid.png",
+        conditions=(
+            ReportCondition(
+                "mostly_safe_correct",
+                "Mostly-safe correctly specified prior",
+                p_risky=0.01,
+                p_risky_prior=0.01,
+            ),
+            ReportCondition(
+                "mostly_safe_severely_pessimistic",
+                "Mostly-safe severely pessimistic prior",
+                p_risky=0.01,
+                p_risky_prior=0.99,
+            ),
+        ),
+        column_titles=("Correctly specified prior", "Severely pessimistic prior"),
+    ),
+    ReportFigure(
+        name="balanced",
+        output_name="balanced_prior_comparison_grid.png",
+        conditions=(
+            ReportCondition(
+                "balanced_correct",
+                "Balanced correctly specified prior",
+                p_risky=0.5,
+                p_risky_prior=0.5,
+            ),
+            ReportCondition(
+                "balanced_severely_pessimistic",
+                "Balanced severely pessimistic prior",
+                p_risky=0.5,
+                p_risky_prior=0.99,
+            ),
+        ),
+        column_titles=("Correctly specified prior", "Severely pessimistic prior"),
+    ),
+]
+
+
 @dataclass
 class TrapBanditConfig:
     num_worlds: int = 200
     num_steps: int = 100
-    num_grid: int = 7
     p_cat: float = 0.01
     seed: int = 123
-    alpha_dgp: tuple[float, float] = (2.0, 2.0)
-    p_beta: tuple[float, float] = (2.0, 2.0)
-    condition_preset: str = "mostly_risky"
-    p_mode: str = "separated"
+    p_risky: float = 0.99
     p_low: float = 0.3
     p_high: float = 0.7
 
 
+def report_conditions() -> dict[str, ReportCondition]:
+    return {
+        condition.name: condition
+        for figure in REPORT_FIGURES
+        for condition in figure.conditions
+    }
+
+
 def p_pair_hypothesis_kwargs(config: TrapBanditConfig) -> dict:
-    if config.p_mode == "separated":
-        return {
-            "p_pairs": [
-                (config.p_low, config.p_high),
-                (config.p_high, config.p_low),
-            ],
-            "p_pair_weights": np.array([0.5, 0.5]),
-        }
-    if config.p_mode != "beta":
-        raise ValueError(f"unknown p_mode {config.p_mode}")
-    return {}
+    return {
+        "p_pairs": [
+            (config.p_low, config.p_high),
+            (config.p_high, config.p_low),
+        ],
+        "p_pair_weights": np.array([0.5, 0.5]),
+    }
 
 
 def make_agent(
@@ -118,9 +165,7 @@ def make_agent(
 ):
     if safe is None or risky is None:
         _wm, safe, risky = make_trap_bandit_hypotheses(
-            num_grid=config.num_grid,
             p_cat=config.p_cat,
-            p_beta=config.p_beta,
             **p_pair_hypothesis_kwargs(config),
         )
     if kind == "ib":
@@ -150,21 +195,12 @@ def make_agent(
 
 
 def sample_world(rng: np.random.Generator, config: TrapBanditConfig):
-    alpha = rng.beta(*config.alpha_dgp)
-    risky = bool(rng.random() < alpha)
-    p_max = 1.0 - config.p_cat
-    if config.p_mode == "separated":
-        if rng.random() < 0.5:
-            p1, p2 = config.p_low, config.p_high
-        else:
-            p1, p2 = config.p_high, config.p_low
-    elif config.p_beta == (1.0, 1.0):
-        p1 = float(rng.uniform(0.0, p_max))
-        p2 = float(rng.uniform(0.0, p_max))
+    risky = bool(rng.random() < config.p_risky)
+    if rng.random() < 0.5:
+        p1, p2 = config.p_low, config.p_high
     else:
-        p1 = min(float(rng.beta(*config.p_beta)), p_max)
-        p2 = min(float(rng.beta(*config.p_beta)), p_max)
-    return {"alpha": alpha, "risky": risky, "p1": p1, "p2": p2}
+        p1, p2 = config.p_high, config.p_low
+    return {"p_risky": config.p_risky, "risky": risky, "p1": p1, "p2": p2}
 
 
 def run_agent_on_world(
@@ -235,18 +271,16 @@ def run_condition(
     config: TrapBanditConfig,
     *,
     kinds: list[str] | None = None,
-    alpha_dgp: tuple[float, float] | None = None,
+    p_risky: float | None = None,
 ) -> dict:
-    if alpha_dgp is not None:
-        config = replace(config, alpha_dgp=alpha_dgp)
+    if p_risky is not None:
+        config = TrapBanditConfig(**{**config.__dict__, "p_risky": p_risky})
     rng = np.random.default_rng(config.seed)
     if kinds is None:
         kinds = DEFAULT_KINDS
     results = {kind: [] for kind in kinds}
     _wm, safe, risky = make_trap_bandit_hypotheses(
-        num_grid=config.num_grid,
         p_cat=config.p_cat,
-        p_beta=config.p_beta,
         **p_pair_hypothesis_kwargs(config),
     )
 
@@ -331,59 +365,23 @@ def summarize_group(runs: list[dict], mask: np.ndarray) -> dict:
     }
 
 
-def get_conditions(config: TrapBanditConfig) -> dict[str, dict[str, float | tuple[float, float]]]:
-    if config.condition_preset == "baseline":
-        return {
-            "correct": {"prior": 0.5, "dgp": config.alpha_dgp},
-            "over_pessimistic": {"prior": 0.99, "dgp": config.alpha_dgp},
-            "misspecified": {"prior": 2.0 / 7.0, "dgp": config.alpha_dgp},
-            "severely_misspecified": {"prior": 0.01, "dgp": config.alpha_dgp},
-            "mostly_safe_correct": {"prior": 0.01, "dgp": (1.0, 99.0)},
-        }
-    if config.condition_preset == "mostly_risky":
-        return {
-            "correct": {"prior": 0.99, "dgp": (99.0, 1.0)},
-            "misspecified": {"prior": 0.5, "dgp": (99.0, 1.0)},
-            "severely_misspecified": {"prior": 0.01, "dgp": (99.0, 1.0)},
-            "mostly_safe_correct": {"prior": 0.01, "dgp": (1.0, 99.0)},
-        }
-    if config.condition_preset == "risky_80":
-        return {
-            "correct": {"prior": 0.8, "dgp": (4.0, 1.0)},
-            "misspecified": {"prior": 0.5, "dgp": (4.0, 1.0)},
-            "severely_misspecified": {"prior": 0.2, "dgp": (4.0, 1.0)},
-            "mostly_safe_correct": {"prior": 0.2, "dgp": (1.0, 4.0)},
-        }
-    raise ValueError(f"unknown condition preset {config.condition_preset}")
-
-
-def _json_conditions(
-    conditions: dict[str, dict[str, float | tuple[float, float]]],
-) -> dict[str, dict[str, float | list[float]]]:
-    return {
-        name: {
-            key: list(value) if isinstance(value, tuple) else value
-            for key, value in condition.items()
-        }
-        for name, condition in conditions.items()
-    }
-
-
 def config_payload(config: TrapBanditConfig, kinds: list[str] | None) -> dict:
     return {
         "num_worlds": config.num_worlds,
         "num_steps": config.num_steps,
-        "num_grid": config.num_grid,
         "p_cat": config.p_cat,
         "seed": config.seed,
-        "alpha_dgp": list(config.alpha_dgp),
-        "p_beta": list(config.p_beta),
-        "condition_preset": config.condition_preset,
-        "p_mode": config.p_mode,
         "p_low": config.p_low,
         "p_high": config.p_high,
         "kinds": kinds,
-        "conditions": _json_conditions(get_conditions(config)),
+        "figures": [
+            {
+                "name": figure.name,
+                "output_name": figure.output_name,
+                "conditions": [condition.__dict__ for condition in figure.conditions],
+            }
+            for figure in REPORT_FIGURES
+        ],
     }
 
 
@@ -416,19 +414,18 @@ def load_summary(results_dir: Path, condition: str) -> dict:
     return json.loads((results_dir / f"{condition}_summary.json").read_text())
 
 
-def plot_risky_condition_grid(
+def plot_prior_comparison_grid(
     results_dir: Path,
     *,
     output_path: Path,
-    conditions: list[str],
+    conditions: tuple[ReportCondition, ReportCondition],
     agents: list[str],
+    column_titles: tuple[str, str],
 ) -> None:
     fig, axes = plt.subplots(2, len(conditions), figsize=(9, 6), sharex=True)
-    if len(conditions) == 1:
-        axes = np.asarray(axes).reshape(2, 1)
 
     for col, condition in enumerate(conditions):
-        summary = load_summary(results_dir, condition)
+        summary = load_summary(results_dir, condition.name)
         ax_regret = axes[0, col]
         ax_trapped = axes[1, col]
 
@@ -458,7 +455,7 @@ def plot_risky_condition_grid(
             )
             ax_trapped.fill_between(steps, p5, p95, alpha=0.12, color=color)
 
-        ax_regret.set_title(CONDITION_LABELS.get(condition, condition))
+        ax_regret.set_title(column_titles[col])
         ax_trapped.set_ylim(-0.02, 1.02)
 
     axes[0, 0].set_ylabel("Cumulative expected regret")
@@ -476,71 +473,31 @@ def ci_cell(point: float, ci: list[float]) -> str:
     return f"{point:.2f} [{lo:.2f}, {hi:.2f}]"
 
 
-def build_latex_table(results_dir: Path) -> str:
-    lines = [
-        r"\begin{table}[t]",
-        r"\centering",
-        r"\small",
-        r"\begin{tabular}{lll rcc}",
-        r"\toprule",
-        r"DGP $\alpha$ & Bayesian prior & Agent & Cat. rate & p50, 95\% CI & p95, 95\% CI \\",
-        r"\midrule",
-    ]
-
-    for dgp_alpha, bayes_prior, agent_label, condition, agent in RESULT_TABLE_ROWS:
-        summary = json.loads((results_dir / f"{condition}_summary.json").read_text())
-        bootstrap = json.loads(
-            (results_dir / f"{condition}_bootstrap_summary.json").read_text()
-        )
-        cat = summary[agent]["catastrophe_rate"]
-        points = bootstrap[agent]["point"]
-        cis = bootstrap[agent]["ci"]
-        p50 = ci_cell(points[1], cis[1])
-        p95 = ci_cell(points[2], cis[2])
-        lines.append(
-            f"{dgp_alpha} & {bayes_prior} & {agent_label} & {cat:.3f} & {p50} & {p95} \\\\"
-        )
-
-    lines.extend([
-        r"\bottomrule",
-        r"\end{tabular}",
-        (
-            r"\caption{Final cumulative expected-regret percentiles with "
-            r"bootstrap confidence intervals.}"
-        ),
-        r"\label{tab:trap-bandit-results}",
-        r"\end{table}",
-        "",
-    ])
-    return "\n".join(lines)
-
-
 def markdown_agent_label(agent_label: str) -> str:
     return agent_label.replace(r"\_", "_")
 
 
 def build_markdown_table(results_dir: Path) -> str:
     lines = [
-        "| DGP alpha | Bayesian prior | agent | catastrophe rate | p5, 95% CI | p50, 95% CI | p95, 95% CI |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: |",
+        "| figure | DGP p_risky | Bayesian p_risky_prior | agent | catastrophe rate | p5, 95% CI | p50, 95% CI | p95, 95% CI |",
+        "| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |",
     ]
-
-    for dgp_alpha, bayes_prior, agent_label, condition, agent in RESULT_TABLE_ROWS:
-        summary = json.loads((results_dir / f"{condition}_summary.json").read_text())
-        bootstrap = json.loads(
-            (results_dir / f"{condition}_bootstrap_summary.json").read_text()
-        )
-        cat = summary[agent]["catastrophe_rate"]
-        points = bootstrap[agent]["point"]
-        cis = bootstrap[agent]["ci"]
-        p5 = ci_cell(points[0], cis[0])
-        p50 = ci_cell(points[1], cis[1])
-        p95 = ci_cell(points[2], cis[2])
-        lines.append(
-            f"| {dgp_alpha} | {bayes_prior} | {markdown_agent_label(agent_label)} | "
-            f"{cat:.3f} | {p5} | {p50} | {p95} |"
-        )
-
+    for figure in REPORT_FIGURES:
+        for condition in figure.conditions:
+            summary = json.loads((results_dir / f"{condition.name}_summary.json").read_text())
+            bootstrap = json.loads((results_dir / f"{condition.name}_bootstrap_summary.json").read_text())
+            for agent in DEFAULT_KINDS:
+                bayes_prior = "n/a" if agent == "ib" else f"{condition.p_risky_prior:g}"
+                cat = summary[agent]["catastrophe_rate"]
+                points = bootstrap[agent]["point"]
+                cis = bootstrap[agent]["ci"]
+                p5 = ci_cell(points[0], cis[0])
+                p50 = ci_cell(points[1], cis[1])
+                p95 = ci_cell(points[2], cis[2])
+                lines.append(
+                    f"| {figure.name} | {condition.p_risky:g} | {bayes_prior} | "
+                    f"{markdown_agent_label(agent)} | {cat:.3f} | {p5} | {p50} | {p95} |"
+                )
     lines.append("")
     return "\n".join(lines)
 
@@ -556,25 +513,24 @@ def run_and_save(
     output_dir.mkdir(parents=True, exist_ok=True)
     if kinds is None:
         kinds = DEFAULT_KINDS
-    conditions = get_conditions(config)
-    payload = config_payload(config, kinds)
+    conditions = report_conditions()
     config_path = output_dir / "config.json"
 
     summaries = {}
-    for name, condition in conditions.items():
+    for condition in conditions.values():
         condition_results = run_condition(
-            condition["prior"],
+            condition.p_risky_prior,
             config,
             kinds=kinds,
-            alpha_dgp=condition["dgp"],
+            p_risky=condition.p_risky,
         )
         summary = summarize(condition_results)
         stacked = {
             kind: _stack_runs(runs)
             for kind, runs in condition_results.items()
         }
-        summaries[name] = summary
-        save_summary(summary, output_dir / f"{name}_summary.json")
+        summaries[condition.name] = summary
+        save_summary(summary, output_dir / f"{condition.name}_summary.json")
         if bootstrap_samples > 0:
             bootstrap = bootstrap_final_regret_percentile_cis(
                 stacked,
@@ -583,34 +539,19 @@ def run_and_save(
             )
             save_bootstrap_summary(
                 bootstrap,
-                output_dir / f"{name}_bootstrap_summary.json",
+                output_dir / f"{condition.name}_bootstrap_summary.json",
             )
-        plot_log_regret(
-            summary,
-            f"Trap bandit log cumulative regret ({name})",
-            str(output_dir / f"{name}_regret.png"),
-        )
-        plot_percentile_band(
-            summary,
-            "trapped_p5_p50_p95",
-            f"Trap-bandit trapped-arm pull rate ({name})",
-            str(output_dir / f"{name}_trapped_arm.png"),
-        )
-        plot_condition_grid(
-            summary,
-            f"Trap bandit ({name})",
-            str(output_dir / f"{name}_grid.png"),
-        )
 
-    config_path.write_text(json.dumps(payload, indent=2))
-    plot_risky_condition_grid(
-        output_dir,
-        output_path=output_dir / "risky_world_prior_comparison_grid.png",
-        conditions=["correct", "severely_misspecified"],
-        agents=["bayes_greedy", "bayes_thompson", "bayes_ucb", "ib"],
-    )
+    config_path.write_text(json.dumps(config_payload(config, kinds), indent=2))
+    for figure in REPORT_FIGURES:
+        plot_prior_comparison_grid(
+            output_dir,
+            output_path=output_dir / figure.output_name,
+            conditions=figure.conditions,
+            agents=kinds,
+            column_titles=figure.column_titles,
+        )
     if bootstrap_samples > 0:
-        (output_dir / "results.tex").write_text(build_latex_table(output_dir))
         (output_dir / "results_table.md").write_text(build_markdown_table(output_dir))
     return summaries
 
@@ -619,43 +560,17 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--num-worlds", type=int, default=200)
     parser.add_argument("--num-steps", type=int, default=100)
-    parser.add_argument("--num-grid", type=int, default=7)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--p-cat", type=float, default=0.01)
-    parser.add_argument(
-        "--condition-preset",
-        choices=["baseline", "mostly_risky", "risky_80"],
-        default="mostly_risky",
-        help="Condition suite to run.",
-    )
-    parser.add_argument(
-        "--p-beta",
-        nargs=2,
-        type=float,
-        metavar=("A", "B"),
-        default=(2.0, 2.0),
-        help="Beta parameters for the p_i DGP and matching agent grid prior.",
-    )
-    parser.add_argument(
-        "--p-mode",
-        choices=["beta", "separated"],
-        default="separated",
-        help="How to generate and hypothesize arm reward probabilities.",
-    )
     parser.add_argument("--p-low", type=float, default=0.3)
     parser.add_argument("--p-high", type=float, default=0.7)
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("experiments/alaro/trap_bandit/results_separated_arms_200_pcat001"),
+        default=Path("experiments/alaro/trap_bandit/results_report_200_pcat001"),
     )
     parser.add_argument("--bootstrap-samples", type=int, default=5000)
     parser.add_argument("--bootstrap-seed", type=int, default=0)
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Accepted for documented reruns; existing output files are overwritten.",
-    )
     parser.add_argument(
         "--kinds",
         nargs="*",
@@ -669,12 +584,8 @@ if __name__ == "__main__":
     cfg = TrapBanditConfig(
         num_worlds=args.num_worlds,
         num_steps=args.num_steps,
-        num_grid=args.num_grid,
         p_cat=args.p_cat,
         seed=args.seed,
-        p_beta=tuple(args.p_beta),
-        condition_preset=args.condition_preset,
-        p_mode=args.p_mode,
         p_low=args.p_low,
         p_high=args.p_high,
     )

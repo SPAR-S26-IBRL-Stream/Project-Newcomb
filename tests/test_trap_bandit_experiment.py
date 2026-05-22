@@ -10,11 +10,12 @@ from ibrl.infrabayesian.builders.trap_bandit import (
     make_trap_bandit_hypotheses,
 )
 from experiments.alaro.trap_bandit.run import (
+    REPORT_FIGURES,
     REWARD_FUNCTION,
     TrapBanditConfig,
     bootstrap_final_regret_percentile_cis,
-    get_conditions,
     parse_args,
+    report_conditions,
     run_condition,
     sample_world,
     summarize,
@@ -69,19 +70,18 @@ def test_bootstrap_final_regret_percentile_cis_shapes():
     )
 
 
-def test_uniform_p_beta_samples_valid_uniform_range():
+def test_sample_world_uses_point_p_risky():
     rng = np.random.default_rng(123)
-    config = TrapBanditConfig(p_cat=0.05, p_beta=(1.0, 1.0))
+    never_risky = TrapBanditConfig(p_risky=0.0)
+    always_risky = TrapBanditConfig(p_risky=1.0)
 
-    samples = [sample_world(rng, config) for _ in range(50)]
-
-    assert all(0.0 <= sample["p1"] <= 0.95 for sample in samples)
-    assert all(0.0 <= sample["p2"] <= 0.95 for sample in samples)
+    assert not any(sample_world(rng, never_risky)["risky"] for _ in range(20))
+    assert all(sample_world(rng, always_risky)["risky"] for _ in range(20))
 
 
-def test_separated_p_mode_samples_only_low_high_assignments():
+def test_sample_world_uses_separated_low_high_assignments():
     rng = np.random.default_rng(123)
-    config = TrapBanditConfig(p_mode="separated", p_low=0.3, p_high=0.7)
+    config = TrapBanditConfig(p_low=0.3, p_high=0.7)
 
     samples = [sample_world(rng, config) for _ in range(50)]
 
@@ -89,98 +89,58 @@ def test_separated_p_mode_samples_only_low_high_assignments():
     assert {sample["p1"] for sample in samples} == {0.3, 0.7}
 
 
-def test_cli_defaults_match_published_results_config(monkeypatch):
+def test_cli_defaults_match_report_config(monkeypatch):
     monkeypatch.setattr("sys.argv", ["run.py"])
 
     args = parse_args()
 
     assert args.num_worlds == 200
     assert args.num_steps == 100
-    assert args.num_grid == 7
     assert args.p_cat == 0.01
-    assert args.condition_preset == "mostly_risky"
-    assert args.p_mode == "separated"
     assert args.p_low == 0.3
     assert args.p_high == 0.7
     assert args.bootstrap_samples == 5000
-    assert args.output_dir.name == "results_separated_arms_200_pcat001"
+    assert args.output_dir.name == "results_report_200_pcat001"
 
 
-def test_baseline_condition_preset_uses_requested_priors():
-    config = TrapBanditConfig(condition_preset="baseline")
-
-    conditions = get_conditions(config)
-
-    assert list(conditions) == [
-        "correct",
-        "over_pessimistic",
-        "misspecified",
-        "severely_misspecified",
-        "mostly_safe_correct",
+def test_report_figures_match_results_md_design():
+    assert [figure.name for figure in REPORT_FIGURES] == [
+        "mostly_risky",
+        "mostly_safe",
+        "balanced",
     ]
-    assert conditions["correct"] == {"prior": 0.5, "dgp": config.alpha_dgp}
-    assert conditions["over_pessimistic"] == {
-        "prior": 0.99,
-        "dgp": config.alpha_dgp,
+
+    pairs = {
+        figure.name: [
+            (condition.p_risky, condition.p_risky_prior)
+            for condition in figure.conditions
+        ]
+        for figure in REPORT_FIGURES
     }
-    assert conditions["misspecified"] == {"prior": 2.0 / 7.0, "dgp": config.alpha_dgp}
-    assert conditions["severely_misspecified"] == {
-        "prior": 0.01,
-        "dgp": config.alpha_dgp,
+    assert pairs == {
+        "mostly_risky": [(0.99, 0.99), (0.99, 0.01)],
+        "mostly_safe": [(0.01, 0.01), (0.01, 0.99)],
+        "balanced": [(0.5, 0.5), (0.5, 0.99)],
     }
 
 
-def test_mostly_risky_condition_preset_uses_requested_priors():
-    config = TrapBanditConfig(condition_preset="mostly_risky")
+def test_report_condition_names_are_unique():
+    conditions = report_conditions()
 
-    conditions = get_conditions(config)
-
-    assert list(conditions) == [
-        "correct",
-        "misspecified",
-        "severely_misspecified",
+    assert len(conditions) == 6
+    assert set(conditions) == {
+        "mostly_risky_correct",
+        "mostly_risky_severely_misspecified",
         "mostly_safe_correct",
-        "mostly_safe_severely_misspecified",
-    ]
-    assert conditions["correct"] == {"prior": 0.99, "dgp": (99.0, 1.0)}
-    assert conditions["misspecified"] == {"prior": 0.5, "dgp": (99.0, 1.0)}
-    assert conditions["severely_misspecified"] == {
-        "prior": 0.01,
-        "dgp": (99.0, 1.0),
+        "mostly_safe_severely_pessimistic",
+        "balanced_correct",
+        "balanced_severely_pessimistic",
     }
-    assert conditions["mostly_safe_correct"] == {
-        "prior": 0.01,
-        "dgp": (1.0, 99.0),
-    }
-    assert conditions["mostly_safe_severely_misspecified"] == {
-        "prior": 0.99,
-        "dgp": (1.0, 99.0),
-    }
-
-
-def test_risky_80_condition_preset_uses_requested_priors():
-    config = TrapBanditConfig(condition_preset="risky_80")
-
-    conditions = get_conditions(config)
-
-    assert conditions["correct"] == {"prior": 0.8, "dgp": (4.0, 1.0)}
-    assert conditions["misspecified"] == {"prior": 0.5, "dgp": (4.0, 1.0)}
-    assert conditions["severely_misspecified"] == {
-        "prior": 0.2,
-        "dgp": (4.0, 1.0),
-    }
-    assert conditions["mostly_safe_correct"] == {
-        "prior": 0.2,
-        "dgp": (1.0, 4.0),
-    }
-
 
 def test_run_condition_tiny_config_end_to_end():
     config = TrapBanditConfig(
         num_worlds=2,
         num_steps=10,
-        num_grid=3,
-        p_mode="separated",
         p_low=0.3,
         p_high=0.7,
     )
