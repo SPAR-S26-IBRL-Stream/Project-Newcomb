@@ -1,15 +1,15 @@
 # Trap Bandit Experiment
 
-Below we describe a simple experiment to demonstrate how a robust infra-Bayesian learner may be beneficial even in a stateless, stochastic bandit setting.
+Below we describe a simple experiment to demonstrate how a robust infra-Bayesian learner may be beneficial even in a stateless, stochastic bandit setting. Of course, it is in more complex, stateful settings, e.g. that require self-consistency and are likely to suffer from non-realizability, that infra-Bayesian learners are expected to be most beneficial. Nevertheless, this simple experiment demonstrates learning under Knightian uncertainty in a realizable single state setting.
 
-The details of our experiment are as follows. There are `K=2` possible arms to pull. There is a probability `alpha` of being in a risky world, and probability `1 - alpha` of being in a safe world.
+The details of our experiment are as follows. There are `K=2` possible arms to pull. There is a data-generating probability `p_risky` of being in a risky world, and probability `1 - p_risky` of being in a safe world.
 
-At the beginning of a new run, `p_1` and `p_2` are newly assigned such that one arm has reward probability `0.3` and the other has reward probability `0.7`. The world_type = {risky, safe} is also sampled. In the safe world, each arm is Bernoulli and has fixed probability, `p_i={0.3,0.7}`, of yielding reward `1`. In the risky world, the arm with the 0.7 bias is a three-sided die with a small probability `p_catastrophe` of yielding reward `-1000`; with probability `0.7`, it yields reward `1`; otherwise it yields reward `0`. The arm with the lower realized bias is still Bernoulli with reward = `{1,0}`.
+At the beginning of a new run, the world_type = {risky, safe} is sampled from `Bernoulli(p_risky)`. Then, `p_1` and `p_2` are newly assigned such that one arm has reward probability `0.3` and the other has reward probability `0.7`. In the safe world, each arm is Bernoulli and has fixed probability, `p_i={0.3,0.7}`, of yielding reward `1`. In the risky world, the arm with the 0.7 bias is a three-sided die with a small probability `p_catastrophe` of yielding reward `-1000`; with probability `0.7`, it yields reward `1`; otherwise it yields reward `0`. The arm with the lower realized bias is still Bernoulli with reward = `{1,0}`.
 
 ```text
 For each new run:
+    sample world_type ~ Bernoulli(p_risky)
     sample (p1, p2) uniformly from {(0.3, 0.7), (0.7, 0.3)}
-    sample world_type ~ Bernoulli(P(risky))
 
     if safe world:
         arm i -> Bernoulli(p_i)
@@ -54,9 +54,9 @@ uv run python -m experiments.alaro.trap_bandit.run \
 --force
 ```
 
-In the first experiment, the Bayesian point prior on `P(risky)` matches the data-generating process in expectation, and the agent's `p1,p2` prior matches the data-generating distribution. In the next experiments, we run misspecified point-prior conditions where Bayesian agents put too little probability on the risky world. Finally, in the mostly-safe experiment, we change the data-generating process to be mostly safe, such that the expected value maximizer would risk pulling the higher-reward arm. The infra-Bayesian agent always shares the same classical `p1,p2` prior as the Bayesian agent but maintains Knightian uncertainty over whether the world is safe or risky.
+We consider three data generating processes: a mostly risky worlds setting, in which the data-generating process has `p_risky=0.99`; a mostly safe worlds setting, in which the data-generating process has `p_risky=0.01`; and a balanced risky/safe worlds setting, in which the data-generating process has `p_risky=0.5`. For each data generating process, we compare Bayesian agents with correctly specified point priors, Bayesian agents with misspecified point priors, and infra-Bayesian learners, which do not specify a prior probability but instead maintain Knightian uncertainty over whether they are in a risky or safe world. The infra-Bayesian agent always shares the same classical `p1,p2` prior as the Bayesian agent but maintains Knightian uncertainty over whether the world is safe or risky.
 
-For Bayesian agents, we compare three exploration strategies:
+Because agents begin each run without knowing which arm is high-reward or whether the world is risky, we must choose strategies to balance the explore-exploit tradeoff. For Bayesian agents, we compare three exploration strategies:
 
 - greedy,
 - Thompson sampling,
@@ -68,83 +68,56 @@ Regret is measured against the best policy with full knowledge of the true world
 
 ## Results
 
-The implementation is in `experiments/alaro/trap_bandit/` and the results were generated using the below configs:
 
-```text
-num_worlds = 200
-num_steps = 100
-p_low = 0.3
-p_high = 0.7
-p_cat = 0.01
-```
+Each comparison figure has four subplots. Columns are the two Bayesian safe-vs-risky priors being compared. The first row shows cumulative expected regret; the second row shows the high-reward/trapped-arm pull rate. Solid lines show medians and shaded bands show empirical 5th-95th percentile ranges across all sampled runs at each time step.
 
-Each result figure has six subplots. Columns are `log(1 + cumulative expected regret)` and `argmax(p1,p2)` pull rate. Rows are overall average, safe worlds, and risky worlds.
+### Mostly risky worlds setting
 
-![Correct-prior grid](results_separated_arms_200_pcat001/correct_grid.png)
+![Mostly-risky prior comparison](results_separated_arms_200_pcat001/mostly_risky_prior_comparison_grid.png)
 
-Figure 2a. Correct-prior results.
+Figure 2a. Mostly-risky DGP, with `p_risky=0.99`. The left column uses the correctly specified Bayesian prior `p_risky_prior=0.99`; the right column uses the severely misspecified prior `p_risky_prior=0.01`.
 
-In the first experiment, the bayesian agent with a correctly specified prior has very similar behavior to the infra-bayesian agent, which maintains knightian uncertainty on whether it is in a risky world or not. They behave nearly identically in this setting because it is not favorable under this data generating process for an expected value maximizer to pull the risky arm. A key positive finding is that the infra-bayesian learner does properly learn which of the two arms is the risky one, at which point it can begin to behave safely. Bayesian UCB explores more than the greedy agents but remains much closer to the infra-bayesian and greedy baselines than the severely misspecified Bayesian agents.
+When the Bayesian prior is correctly specified, greedy Bayes and the infra-Bayesian agent behave nearly identically. Under severe misspecification, however, the Bayesian agents initially treat the world as mostly safe, pull the high-reward trapped arm much more often, and incur substantially larger regret. This is the main robustness result: IB is insensitive to this particular underestimation of risky worlds because it does not collapse safe-vs-risky uncertainty to a single point prior.
 
-Next, we examine two misspecified point priors for the probability that the world is risky.
+### Mostly safe worlds setting
 
-![Misspecified-prior grid](results_separated_arms_200_pcat001/misspecified_grid.png)
+![Mostly-safe prior comparison](results_separated_arms_200_pcat001/mostly_safe_prior_comparison_grid.png)
 
-Figure 2b. Misspecified-prior results.
+Figure 2b. Mostly-safe DGP, with `p_risky=0.01`. The left column uses the correctly specified Bayesian prior `p_risky_prior=0.01`; the right column uses the severely misspecified pessimistic prior `p_risky_prior=0.99`.
 
-In the first, slightly misspecified setting, the Bayesian agent uses point prior `P(risky)=0.5` (while the data-generating process still has `P(risky)=0.99`). The results of the greedy Bayesian agent does not change, because it still doesn't "pay" for a Bayesian agent to pull the risky arm even with this more modest prior. That said, the Bayesian agent who explores via Thompson sampling suffers significantly.
+This figure shows the cost of the same conservative behavior. In the correctly specified mostly-safe setting, Bayes exploits the higher-reward arm and obtains much lower cumulative regret, while the infra-Bayesian agent remains cautious because the risky-world hypothesis is still live. When Bayes is instead given a severely pessimistic prior, the greedy Bayesian agent behaves like the conservative infra-Bayesian agent.
 
-![Severely misspecified-prior grid](results_separated_arms_200_pcat001/severely_misspecified_grid.png)
+### Balanced safe/risky worlds setting
 
-Figure 2c. Severely misspecified-prior results.
+![Balanced-risk prior comparison](results_baseline_200_pcat001_overpessimistic/balanced_prior_comparison_grid.png)
 
-In the extremely misspecified setting, the Bayesian agent uses point prior `P(risky)=0.01` (while the data-generating process still has `P(risky)=0.99`). Now under the starting prior, it would "pay" to choose the risky arm. Thus, the Bayesian agent incurs significant regret by pulling the risky arm until it adjusts its posterior enough to reflect the actual world and begins to act more conservatively.
+Figure 2c. Balanced-risk DGP, with `p_risky=0.5`. The left column uses the correctly specified Bayesian prior `p_risky_prior=0.5`; the right column uses the severely pessimistic prior `p_risky_prior=0.99`.
 
-As a final experiment, we change the data-generating process to be mostly safe, with `P(risky)=0.01`, and show the results below.
-
-![Mostly-safe correct-prior grid](results_separated_arms_200_pcat001/mostly_safe_correct_grid.png)
-
-Figure 2d. Mostly-safe correctly specified prior results.
-
-Here, the infra-bayesian agent can be seen to drastically underperform in cumulative regret because, of course, it is maintaining knightian uncertainty about the high reward arm being risky. In a very safe world, this will come at a signficant cost. Additionally, one might note that the scale of regret is significantly lower in the safe worlds. Even a large relative cost in regret for an infra-bayesian agent in a world that turns out to be safe might be a small price to pay for the security, especially if one really has no way of specifying a reasonable prior a priori.
-
-As an additional calibration check, we also run a balanced-risk DGP with `alpha_DGP ~ Beta(2,2)`, comparing calibrated Bayes against an over-pessimistic Bayesian prior `P(risky)=0.99`. This separates the benefit of robust safe/risky uncertainty from the simpler strategy of using a fixed highly pessimistic Bayesian prior.
-
-![Balanced-risk over-pessimistic prior grid](results_baseline_200_pcat001_overpessimistic/over_pessimistic_grid.png)
-
-Figure 2e. Balanced-risk DGP with over-pessimistic Bayes prior.
-
-In this balanced-risk setting, the greedy Bayesian agent with `P(risky)=0.99` behaves almost identically to the infra-bayesian agent, including the same catastrophe rate in this run (`0.005`) and the same final regret percentiles (`p50=38.8`, `p95=105.6`). Thus this ablation clarifies the mechanism: the mostly-risky experiment shows that IB is robust to underestimating risk, but the greedy-policy result alone does not distinguish IB from a sufficiently pessimistic fixed Bayesian prior.
+In the balanced setting, the value maximizing decision is to avoid the risky arm. Thus, both the correctly specified greedy Bayes agent and the misspecified, overly pessimistic greedy Bayes agent behave like the infra-Bayesian agent. These greedy-policy results do not distinguish IB from a sufficiently pessimistic fixed Bayesian `p_risky_prior`. Thompson sampling and Bayesian UCB can differ because their exploration strategies deliberately sample actions that greedy policies avoid. Interestingly, the pessimistic greedy Bayesian agent does not self-correct its behavior like we see in the misspecified mostly risky worlds setting. This is because the agent will never collect information to disprove its hypothesis that it is in a risky world. In choosing to only pull the safe arm, it will never gather information on the risky arm that would help it learn the world it is in is safe.
 
 # Summary
 
-Across these experiments, infra-Bayes behaves conservatively in a way that protects it from not knowing whether the world is risky: when Bayes has a misspecified point prior that strongly underestimates risky worlds, greedy Bayes pulls the high-reward/high-risk arm more often and suffers worse regret, while IB's performance is stable. With a correct or mildly misspecified point prior, greedy Bayes and IB are broadly similar in worlds where it "pays" to pull the guaranteed-safe arm. The tradeoff is clear in the mostly-safe, correctly specified setting (ie where it "pays" to pull the risky arm): Bayes exploits the high-reward arm and achieves much lower regret, while IB remains cautious because the risky-world hypothesis is still live.
-
-The separated-arm setup makes this comparison cleaner than the broader beta-grid runs we demonstrated in previous commits. There are no near-tie worlds where the agent must infer tiny differences between arm probabilities; one arm is clearly high reward, and in risky worlds that same arm is trapped. This makes the strongest result easier to interpret: severe underestimation of risky worlds hurts Bayes, while IB remains stable.
+Across these experiments, infra-Bayes behaves conservatively in a way that protects it from not knowing whether the world is risky: when Bayes has a misspecified point prior that strongly underestimates risky worlds, greedy Bayes pulls the high-reward/high-risk arm more often and suffers worse regret, while IB's performance is stable. With a correct or mildly misspecified point prior, greedy Bayes and IB are broadly similar in worlds where it "pays" to pull the guaranteed-safe arm. The tradeoff is clear in the mostly-safe, correctly specified setting (i.e. where it "pays" to pull the risky arm): Bayes exploits the high-reward arm and achieves much lower regret, while IB remains cautious because the risky-world hypothesis is still live.
 
 # Appendix
 
-Final cumulative expected-regret percentiles from `results_separated_arms_200_pcat001`. Brackets show 95% bootstrap CIs from 5000 resamples over worlds.
+Final cumulative expected-regret percentiles from `results_separated_arms_200_pcat001`. Brackets show 95% bootstrap CIs from 5000 resamples over worlds. This table reports the mostly-risky and mostly-safe runs from that output directory; the balanced-risk ablation is summarized in Figure 2c.
 
-IB rows are not repeated across the three mostly-risky prior conditions because the IB agent does not use a Bayesian safe-vs-risky point prior. Rows are ordered by agent family: IB, Bayesian UCB, all greedy Bayesian priors, all Thompson-sampling Bayesian priors, then the mostly-safe results in the same order.
+IB rows are not repeated across the three mostly-risky prior conditions because the IB agent does not use a Bayesian safe-vs-risky point prior. Rows are ordered by agent family: IB, Bayesian UCB, all greedy Bayesian `p_risky_prior` values, all Thompson-sampling Bayesian `p_risky_prior` values, then the mostly-safe results in the same order.
 
-| DGP alpha | Bayesian prior | agent | catastrophe rate | p5, 95% CI | p50, 95% CI | p95, 95% CI |
+| DGP p_risky | Bayesian p_risky_prior | agent | catastrophe rate | p5, 95% CI | p50, 95% CI | p95, 95% CI |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| 0.99 | n/a | infra_bayesian | 0.045 | 0.00 [0.00, 0.00] | 9.60 [9.60, 9.60] | 125.76 [96.48, 183.36] |
-| 0.99 | 0.99 | bayes_ucb | 0.070 | 9.60 [9.60, 9.60] | 38.40 [38.40, 48.00] | 124.80 [105.60, 192.00] |
-| 0.99 | 0.5 | bayes_ucb | 0.645 | 37.92 [19.20, 76.32] | 619.20 [504.00, 715.20] | 950.40 [940.80, 950.40] |
-| 0.99 | 0.01 | bayes_ucb | 0.635 | 37.92 [19.20, 66.72] | 604.80 [499.20, 720.00] | 940.80 [931.20, 940.80] |
-| 0.99 | 0.99 | bayes_greedy | 0.045 | 0.00 [0.00, 0.00] | 9.60 [9.60, 9.60] | 125.76 [105.60, 183.36] |
-| 0.99 | 0.5 | bayes_greedy | 0.045 | 0.00 [0.00, 0.00] | 9.60 [9.60, 9.60] | 125.76 [105.60, 183.36] |
-| 0.99 | 0.01 | bayes_greedy | 0.645 | 37.92 [19.20, 76.80] | 624.00 [528.00, 744.00] | 960.00 [950.88, 960.00] |
-| 0.99 | 0.99 | bayes_thompson | 0.080 | 0.00 [0.00, 9.60] | 38.40 [28.80, 38.40] | 115.20 [96.00, 144.00] |
-| 0.99 | 0.5 | bayes_thompson | 0.500 | 48.00 [19.20, 57.60] | 460.80 [412.80, 499.20] | 604.80 [576.00, 614.40] |
-| 0.99 | 0.01 | bayes_thompson | 0.645 | 38.40 [9.60, 76.32] | 580.80 [484.80, 720.00] | 950.40 [940.80, 950.40] |
-| 0.01 | n/a | infra_bayesian | 0.000 | 30.80 [27.60, 34.01] | 39.60 [39.60, 39.60] | 40.00 [40.00, 40.00] |
-| 0.01 | 0.01 | bayes_ucb | 0.015 | 0.40 [0.40, 0.80] | 2.00 [2.00, 2.40] | 6.40 [5.20, 8.40] |
-| 0.01 | 0.01 | bayes_greedy | 0.015 | 0.00 [0.00, 0.00] | 0.40 [0.40, 0.80] | 5.60 [4.02, 9.60] |
-| 0.01 | 0.01 | bayes_thompson | 0.015 | 0.40 [0.00, 0.40] | 1.60 [1.20, 1.60] | 7.60 [5.22, 11.60] |
-
-![Risky-world prior comparison](results_separated_arms_200_pcat001/risky_world_prior_comparison_grid.png)
-
-Figure 3. Mostly-risky comparison across Bayes priors. Columns are the correctly specified and severely misspecified Bayes prior conditions; rows are cumulative expected regret and high/trapped-arm pull rate. Each column compares Infra-Bayesian, Bayesian Greedy, Bayesian Thompson Sampling, and Bayesian UCB agents over all sampled runs.
+| 0.99 | n/a | infra_bayesian | 0.040 | 0.00 [0.00, 0.00] | 9.60 [9.60, 9.60] | 144.00 [96.48, 183.36] |
+| 0.99 | 0.99 | bayes_ucb | 0.075 | 9.60 [9.60, 19.20] | 38.40 [38.40, 48.00] | 134.88 [115.20, 172.80] |
+| 0.99 | 0.5 | bayes_ucb | 0.635 | 48.00 [18.72, 84.96] | 595.20 [504.00, 758.40] | 950.40 [940.80, 950.40] |
+| 0.99 | 0.01 | bayes_ucb | 0.635 | 48.00 [18.72, 66.72] | 585.60 [504.00, 724.80] | 940.80 [931.20, 950.40] |
+| 0.99 | 0.99 | bayes_greedy | 0.040 | 0.00 [0.00, 0.00] | 9.60 [9.60, 9.60] | 144.00 [96.48, 183.36] |
+| 0.99 | 0.5 | bayes_greedy | 0.040 | 0.00 [0.00, 0.00] | 9.60 [9.60, 9.60] | 144.00 [96.48, 183.36] |
+| 0.99 | 0.01 | bayes_greedy | 0.650 | 48.00 [19.20, 76.80] | 609.60 [508.80, 739.20] | 960.00 [950.40, 960.00] |
+| 0.99 | 0.99 | bayes_thompson | 0.075 | 9.60 [0.00, 9.60] | 28.80 [28.80, 38.40] | 124.80 [96.00, 154.56] |
+| 0.99 | 0.5 | bayes_thompson | 0.465 | 48.00 [19.18, 67.20] | 499.20 [436.80, 518.40] | 614.88 [604.80, 633.60] |
+| 0.99 | 0.01 | bayes_thompson | 0.645 | 57.12 [19.20, 76.80] | 595.20 [499.20, 739.20] | 950.40 [940.80, 950.40] |
+| 0.01 | n/a | infra_bayesian | 0.000 | 31.58 [30.36, 34.00] | 39.60 [39.60, 39.60] | 40.00 [40.00, 40.00] |
+| 0.01 | 0.01 | bayes_ucb | 0.015 | 0.40 [0.40, 0.78] | 2.00 [1.60, 2.00] | 7.24 [5.22, 12.00] |
+| 0.01 | 0.01 | bayes_greedy | 0.015 | 0.00 [0.00, 0.00] | 0.40 [0.40, 0.40] | 4.80 [2.84, 6.40] |
+| 0.01 | 0.01 | bayes_thompson | 0.015 | 0.38 [0.00, 0.40] | 1.60 [1.20, 1.60] | 6.82 [4.42, 7.60] |
