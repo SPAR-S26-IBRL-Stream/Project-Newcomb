@@ -163,3 +163,49 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
 
         db.update(db_policy, action, outcome)
         ib.update(ib_policy, action, outcome)
+
+
+def test_bayesian_ucb_rejects_non_component_mixture_world_model():
+    from ibrl.agents.infrabayesian import InfraBayesianAgent
+    from ibrl.exploration import BayesianUCB
+
+    wm = MultiBernoulliWorldModel(num_arms=NUM_ARMS)
+    hypothesis = Infradistribution(
+        [AMeasure(wm.make_params([np.array([0.3, 0.7])]))],
+        world_model=wm,
+    )
+    agent = InfraBayesianAgent(
+        num_actions=NUM_ARMS,
+        hypotheses=[hypothesis],
+        prior=np.array([1.0]),
+        reward_function=np.tile(REWARD, (NUM_ARMS, 1)),
+        exploration_strategy=BayesianUCB(),
+        epsilon=0.0,
+    )
+    agent.reset()
+
+    with pytest.raises(RuntimeError, match="components attribute"):
+        agent.get_probabilities()
+
+
+def test_thompson_sampling_rejects_non_component_mixture_world_model():
+    from ibrl.agents.infrabayesian import InfraBayesianAgent
+    from ibrl.exploration import HypothesisThompsonSampling
+
+    wm = MultiBernoulliWorldModel(num_arms=NUM_ARMS)
+    hypothesis = Infradistribution(
+        [AMeasure(wm.make_params([np.array([0.3, 0.7])]))],
+        world_model=wm,
+    )
+    agent = InfraBayesianAgent(
+        num_actions=NUM_ARMS,
+        hypotheses=[hypothesis],
+        prior=np.array([1.0]),
+        reward_function=np.tile(REWARD, (NUM_ARMS, 1)),
+        exploration_strategy=HypothesisThompsonSampling(),
+        epsilon=0.0,
+    )
+    agent.reset()
+
+    with pytest.raises(RuntimeError, match="components attribute"):
+        agent.get_probabilities()

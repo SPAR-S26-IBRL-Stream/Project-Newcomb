@@ -8,6 +8,7 @@ from .damascus import DeathInDamascusEnvironment
 from .asymmetric_damascus import AsymmetricDeathInDamascusEnvironment
 from .coordination import CoordinationGameEnvironment
 from .policy_dependent_bandit import PolicyDependentBanditEnvironment
+from .trap_bandit import TrapBanditEnvironment
 
 __all__ = [
     "BaseEnvironment",
@@ -19,5 +20,6 @@ __all__ = [
     "DeathInDamascusEnvironment",
     "AsymmetricDeathInDamascusEnvironment",
     "CoordinationGameEnvironment",
-    "PolicyDependentBanditEnvironment"
+    "PolicyDependentBanditEnvironment",
+    "TrapBanditEnvironment",
 ]

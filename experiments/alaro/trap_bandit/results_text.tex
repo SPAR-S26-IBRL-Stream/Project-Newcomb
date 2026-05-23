@@ -1,0 +1,62 @@
+\section{Trap Bandit Experiments}
+\label{section:trap-bandits}
+
+We consider a simple experiment illustrating how a robust infra-Bayesian learner can be useful even in a stateless stochastic bandit setting. The environment has two arms, indexed by \(i \in \{1,2\}\). At the start of each run, the arm reward probabilities \((p_1,p_2)\) are sampled uniformly from
+\[
+    \{(0.3,0.7), (0.7,0.3)\},
+\]
+so that one arm has significantly higher expected reward than the other. Independently, the world is sampled to be either safe or risky, with probability \(\alpha\) of being risky and probability \(1-\alpha\) of being safe.
+
+In a safe world, each arm is Bernoulli with reward probability \(p_i\). In a risky world, the arm with the larger reward probability is also the trapped arm. Pulling this arm yields a catastrophic reward of \(-1000\) with probability \(p_{\mathrm{cat}}\), yields reward \(1\) with probability \(p_i\), and yields reward \(0\) otherwise. The lower-probability arm remains Bernoulli. Thus each run is generated as follows:
+\[
+\begin{array}{ll}
+\text{sample} & (p_1,p_2) \sim \mathrm{Unif}\{(0.3,0.7),(0.7,0.3)\},\\
+\text{sample} & \text{world type} \sim \mathrm{Bernoulli}(\alpha),\\[2mm]
+\text{if safe:} & r_i \sim \mathrm{Bernoulli}(p_i),\\[1mm]
+\text{if risky:} &
+\begin{cases}
+\text{the trap arm } \arg\max_i p_i \text{ yields } -1000 \text{ with probability } p_{\mathrm{cat}},\\
+\text{the trap arm yields } 1 \text{ with probability } p_i,\\
+\text{the trap arm yields } 0 \text{ otherwise},\\
+\text{the other arm yields } r_i \sim \mathrm{Bernoulli}(p_i).
+\end{cases}
+\end{array}
+\]
+
+We compare classical Bayesian agents with an infra-Bayesian agent using the same joint hypothesis machinery. Bayesian agents represent uncertainty using \texttt{Infradistribution.mix(...)}. The infra-Bayesian agent instead uses Knightian uncertainty over the safe and risky world families via \texttt{Infradistribution.mixKU(...)}, while retaining ordinary Bayesian uncertainty over \((p_1,p_2)\) within each family.
+
+The experiments vary the relationship between the true risky-world probability, \(\alpha_{\mathrm{DGP}}\), and the Bayesian agent's point prior, \(\alpha_{\mathrm{prior}}\). In the main mostly-risky setting, we set \(\alpha_{\mathrm{DGP}}=0.99\). We first consider a correctly specified Bayesian prior, \(\alpha_{\mathrm{prior}}=0.99\), and then a severely misspecified prior, \(\alpha_{\mathrm{prior}}=0.01\). Across these conditions, the infra-Bayesian agent uses the same classical prior over \((p_1,p_2)\) as the Bayesian agents, but maintains Knightian uncertainty over whether the world is safe or risky.
+
+For Bayesian agents, we evaluate two exploration strategies: greedy action selection and Thompson sampling. The infra-Bayesian agent uses greedy action selection with respect to its robust lower values, with uniform tie-breaking. Regret is measured relative to the best policy with full knowledge of the true world. We report cumulative expected regret percentiles and trapped-arm pull-rate percentiles. Results are shown in Figure \ref{fig:trapped-bandits}.
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=\textwidth]{trapped_bandits.png}
+    \caption{Comparing the performance of infra-Bayesian and classical Bayesian agents (with either greedy or Thompson Sampling exploration strategies) in the trap bandit setting. The first row shows results for a correctly specified Bayes prior condition; the second for a severely misspecified Bayes prior condition. The first column shows cumulative expected regret, and the second shows the average pull rate of the risky (trap) arm.}
+    \label{fig:trapped-bandits}
+\end{figure}
+
+When the Bayesian prior is correctly specified, greedy Bayes and the infra-Bayesian agent behave nearly identically in risky worlds. This is expected: when the risky-world probability is high, expected-value maximization already favors the conservative action. The infra-Bayesian agent nevertheless obtains this behavior without committing to a point prior over the safe/risky model class. Under severe misspecification, however, greedy Bayes initially treats the world as mostly safe, repeatedly pulls the high-reward trapped arm, and incurs much larger expected regret and a high catastrophe rate. Thompson sampling slightly reduces regret in this misspecified condition, but does not remove the failure mode.
+
+These results show infra-Bayesian agents matching or outperforming classical Bayesian agents in risky worlds, which raises a natural question: at what cost? Table~\ref{tab:trap-bandit-results} includes an alternative mostly-safe scenario with \(\alpha_{\mathrm{DGP}}=0.01\). In this setting, the infra-Bayesian agent incurs substantially higher regret, reflecting the cost of maintaining Knightian uncertainty over the risky-world hypothesis.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lll rcc}
+\toprule
+$\alpha$ (DGP) & $\alpha$ (Prior) & Agent & Cat. rate & p50, 95\% CI & p95, 95\% CI \\
+\midrule
+0.99 & n/a & infra\_bayesian & 0.045 & 9.60 [9.60, 9.60] & 125.76 [105.60, 183.36] \\
+0.99 & 0.99 & bayes\_greedy & 0.045 & 9.60 [9.60, 9.60] & 125.76 [96.48, 183.36] \\
+0.99 & 0.01 & bayes\_greedy & 0.645 & 624.00 [528.00, 748.80] & 960.00 [950.88, 960.00] \\
+0.99 & 0.99 & bayes\_thompson & 0.080 & 38.40 [28.80, 38.40] & 115.20 [96.00, 144.00] \\
+0.99 & 0.01 & bayes\_thompson & 0.645 & 580.80 [489.60, 720.00] & 950.40 [940.80, 950.40] \\
+0.01 & n/a & infra\_bayesian & 0.000 & 39.60 [39.60, 39.60] & 40.00 [40.00, 40.00] \\
+0.01 & 0.01 & bayes\_greedy & 0.015 & 0.40 [0.40, 0.80] & 5.60 [4.02, 9.64] \\
+0.01 & 0.01 & bayes\_thompson & 0.015 & 1.60 [1.20, 1.60] & 7.60 [5.22, 11.60] \\
+\bottomrule
+\end{tabular}
+\caption{Final cumulative expected-regret percentiles with bootstrap confidence intervals.}
+\label{tab:trap-bandit-results}
+\end{table}

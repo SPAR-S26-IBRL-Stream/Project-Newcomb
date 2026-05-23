@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 
 from . import BaseGreedyAgent
+from ..exploration import ExplorationStrategy
 from ..infrabayesian.a_measure import AMeasure
 from ..infrabayesian.infradistribution import Infradistribution
 
@@ -31,6 +32,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
             reward_function : np.ndarray | None = None, # shape (num_actions, num_outcomes)
             policy_discretisation : int = 0,
             exploration_prefix : int | None = 0,
+            exploration_strategy : ExplorationStrategy | None = None,
             **kwargs):
         super().__init__(**kwargs)
         assert len(hypotheses) > 0
@@ -42,6 +44,7 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.reward_function = (reward_function if reward_function is not None
                                 else np.linspace(np.zeros(self.num_actions),np.ones(self.num_actions),2).T)
         self.exploration_prefix = exploration_prefix
+        self.exploration_strategy = exploration_strategy
 
         # Discretise policy space:
         # Let n be the number of actions and 1/d be the distance between discretised policies
@@ -63,9 +66,18 @@ class InfraBayesianAgent(BaseGreedyAgent):
         self.dist.update(self.reward_function, outcome, action, probabilities)
 
     def get_probabilities(self) -> np.ndarray:
+        if self.exploration_strategy is not None:
+            if len(self.dist.measures) != 1:
+                raise RuntimeError(
+                    "Multi-measure infradistributions require "
+                    "exploration_strategy=None until IB exploration "
+                    "semantics are defined."
+                )
+            return self.exploration_strategy.get_probabilities(self, self._action_values())
+
         # Greedy policy: reproduces classical agent, breaks regret bounds
         if self.exploration_prefix is None:
-            return self.build_greedy_policy(self._optimal_policy())
+            return self.build_greedy_policy(self._action_values())
 
         # Forced exploration prefix: regret bounds asymptotically preserved
         if self.step <= self.exploration_prefix:
@@ -81,13 +93,65 @@ class InfraBayesianAgent(BaseGreedyAgent):
         return state
 
     def _expected_rewards(self) -> np.ndarray:
-        """Expected reward of each policy"""
-        # Iterate over policies and compute expected reward: E[π] = Σ_a E_π[a] π(a)
-        return np.array([sum(
-            self.dist.evaluate_action(self.reward_function[a], a, policy) * policy[a]
-                for a in range(self.num_actions)
-            ) for policy in self.policies
+        """Expected reward of each policy."""
+        return np.array([
+            sum(self._action_values_for_policy(policy) * policy)
+            for policy in self.policies
         ])
+
+    def _action_values(self) -> np.ndarray:
+        policy = np.ones(self.num_actions) / self.num_actions
+        return self._action_values_for_policy(policy)
+
+    def _action_values_for_policy(self, policy: np.ndarray) -> np.ndarray:
+        return np.array([
+            self.dist.evaluate_action(self.reward_function[a], a, policy)
+            for a in range(self.num_actions)
+        ])
+
+    def sample_component_from_posterior(self):
+        """Sample one complete component from a world model posterior mixture."""
+        params = self._component_mixture_params(
+            "HypothesisThompsonSampling requires a single Bayesian mixture "
+            "measure; KU/multi-measure infradistributions are not supported. "
+        )
+        world_model = self.dist.world_model
+        weights = world_model.get_posterior_component_weights(self.dist.belief_state, params)
+        idx = int(self.random.choice(len(params.components), p=weights))
+        return params.components[idx]
+
+    def posterior_component_action_values(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return component action values and posterior weights for one Bayesian measure."""
+        params = self._component_mixture_params(
+            "Bayesian posterior component exploration requires a single "
+            "Bayesian mixture measure."
+        )
+        world_model = self.dist.world_model
+        weights = world_model.get_posterior_component_weights(self.dist.belief_state, params)
+        component_values = np.array([
+            world_model.get_component_expected_rewards(component, self.reward_function)
+            for component in params.components
+        ])
+        return component_values, weights
+
+    def values_for_component(self, component) -> np.ndarray:
+        self._component_mixture_params(
+            "Bayesian posterior component exploration requires a single "
+            "Bayesian mixture measure."
+        )
+        return self.dist.world_model.get_component_expected_rewards(component, self.reward_function)
+
+    def _component_mixture_params(self, multi_measure_message: str):
+        if len(self.dist.measures) != 1:
+            raise RuntimeError(multi_measure_message)
+        params = self.dist.measures[0].params
+        if not hasattr(params, "components"):
+            raise RuntimeError(
+                "Bayesian posterior component exploration requires finite "
+                "component-mixture world-model parameters with a components "
+                "attribute."
+            )
+        return params
 
     def _optimal_policy(self) -> np.ndarray:
         """Policy that maximises expected reward"""
