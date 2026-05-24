@@ -41,6 +41,25 @@ experiments/fllor2/ku_demo_outputs/ku_regret_preview.png
 `ku_demo.ipynb` contains the original exploratory simulation, while
 `ku_demo.py` is the stable reproduction entrypoint for the exact plotted data.
 
+This directory also contains the Newcomb predictor-accuracy figure data. Run:
+
+```bash
+uv run python -m experiments.fllor2.newcomb_accuracy
+```
+
+This writes:
+
+```text
+experiments/fllor2/newcomb_accuracy_outputs/newcomb_accuracy_data.tex
+experiments/fllor2/newcomb_accuracy_outputs/newcomb_accuracy_preview.png
+```
+
+`newcomb_accuracy_data.tex` is the PGFPlots table used by the LaTeX figure.
+`newcomb_accuracy_preview.png` is a local rendering for quick inspection. The
+notebook `newcomb.ipynb` contains the original exploratory simulation, while
+`newcomb_accuracy.py` is the stable reproduction entrypoint for the exact
+plotted data.
+
 ## Architecture Notes
 
 This is an explanation of the updated IB agent architecture.
