@@ -164,7 +164,6 @@ def test_bayesian_ucb_returns_valid_policy():
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         exploration_strategy=BayesianUCB(quantile=0.95),
-        epsilon=0.0,
     )
     agent.reset()
     probs = agent.get_probabilities()
@@ -183,7 +182,6 @@ def test_trap_bandit_hypothesis_builders_construct_agents():
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         exploration_strategy=Greedy(),
-        epsilon=0.0,
     )
     ib = InfraBayesianAgent(
         num_actions=2,
@@ -191,7 +189,6 @@ def test_trap_bandit_hypothesis_builders_construct_agents():
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         exploration_strategy=None,
-        epsilon=0.0,
     )
     bayes.reset()
     ib.reset()
@@ -228,7 +225,6 @@ def test_thompson_sampling_returns_valid_policy():
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         exploration_strategy=HypothesisThompsonSampling(),
-        epsilon=0.0,
     )
     agent.reset()
     probs = agent.get_probabilities()
@@ -245,7 +241,6 @@ def test_thompson_sampling_rejects_ku_multi_measure_hypothesis():
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         exploration_strategy=HypothesisThompsonSampling(),
-        epsilon=0.0,
     )
     agent.reset()
 
@@ -262,7 +257,6 @@ def test_exploration_strategy_rejects_ku_multi_measure_hypothesis():
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         exploration_strategy=Greedy(),
-        epsilon=0.0,
     )
     agent.reset()
 

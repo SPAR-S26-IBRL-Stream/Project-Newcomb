@@ -21,7 +21,7 @@ options = {
     "seed":        42,
     "verbose":     2,
 }
-shared = dict(num_actions=n, seed=options["seed"] + 0x01234567, verbose=options["verbose"], epsilon=0.1)
+shared = dict(num_actions=n, seed=options["seed"] + 0x01234567, verbose=options["verbose"])
 
 
 def make_bernoulli(alpha, beta):

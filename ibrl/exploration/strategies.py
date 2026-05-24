@@ -22,20 +22,40 @@ class Greedy(ExplorationStrategy):
 class EpsilonGreedy(ExplorationStrategy):
     """Epsilon-greedy exploration with a fixed or scheduled epsilon."""
 
-    def __init__(self, epsilon: float | tuple[float, float, float]):
+    def __init__(self, epsilon: float | tuple[float, float, float], decay_type: int = 0):
         self.epsilon = epsilon
+        self.decay_type = int(decay_type)
 
     def get_probabilities(self, agent, values: np.ndarray) -> np.ndarray:
         greedy = Greedy().get_probabilities(agent, values)
-        eps = self._epsilon(agent)
+        eps = _scheduled_value(self.epsilon, agent.step, self.decay_type)
         uniform = np.ones(agent.num_actions) / agent.num_actions
         return (1 - eps) * greedy + eps * uniform
 
-    def _epsilon(self, agent) -> float:
-        if isinstance(self.epsilon, tuple):
-            start, rate, end = self.epsilon
-            return max(start / (agent.step ** rate), end)
-        return float(self.epsilon)
+
+class Softmax(ExplorationStrategy):
+    """Softmax action selection with a fixed or scheduled temperature."""
+
+    def __init__(self, temperature: float | tuple[float, float, float], decay_type: int = 0):
+        self.temperature = temperature
+        self.decay_type = int(decay_type)
+
+    def get_probabilities(self, agent, values: np.ndarray) -> np.ndarray:
+        temperature = _scheduled_value(self.temperature, agent.step, self.decay_type)
+        exp = np.exp((values - values.max()) / temperature)
+        return exp / exp.sum()
+
+
+def _scheduled_value(parameter: float | tuple[float, float, float], step: int, decay_type: int) -> float:
+    if isinstance(parameter, float):
+        return parameter
+    if decay_type == 0:
+        start, rate, end = parameter
+        return max(start / (step ** rate), end)
+    if decay_type == 1:
+        start, last_step, end = parameter
+        return end if step >= last_step else (start + (end - start) * (step / last_step))
+    raise RuntimeError("Invalid decay_type")
 
 
 class UniformPrefixThen(ExplorationStrategy):

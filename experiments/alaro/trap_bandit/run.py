@@ -188,9 +188,7 @@ def make_agent(
         prior=np.array([1.0]),
         reward_function=REWARD_FUNCTION,
         policy_discretisation=0,
-        exploration_prefix=0,
         exploration_strategy=strategy,
-        epsilon=0.0,
     )
 
 

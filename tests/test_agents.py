@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from ibrl.agents import QLearningAgent, BayesianAgent, EXP3Agent
+from ibrl.exploration import EpsilonGreedy, Greedy, Softmax
 from ibrl.outcome import Outcome
 
 
@@ -42,6 +43,25 @@ class TestQLearningAgent:
         outcome = Outcome(reward=1.0)
         agent.update(probs, 0, outcome)
         assert agent.counts[0] == 1
+
+    def test_epsilon_argument_creates_strategy(self, num_actions, seed):
+        agent = QLearningAgent(num_actions=num_actions, epsilon=0.2, seed=seed)
+        assert isinstance(agent.exploration_strategy, EpsilonGreedy)
+        assert agent.epsilon == 0.2
+
+    def test_temperature_argument_creates_strategy(self, num_actions, seed):
+        agent = QLearningAgent(num_actions=num_actions, temperature=1.0, seed=seed)
+        assert isinstance(agent.exploration_strategy, Softmax)
+        assert agent.temperature == 1.0
+
+    def test_explicit_strategy_rejects_legacy_arguments(self, num_actions, seed):
+        with pytest.raises(RuntimeError, match="exploration_strategy"):
+            QLearningAgent(
+                num_actions=num_actions,
+                exploration_strategy=Greedy(),
+                epsilon=0.0,
+                seed=seed,
+            )
 
 
 class TestBayesianAgent:

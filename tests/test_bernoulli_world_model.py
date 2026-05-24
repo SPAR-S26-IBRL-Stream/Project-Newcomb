@@ -142,7 +142,7 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     db = DiscreteBayesianAgent(num_actions=n, num_hypotheses=num_hypotheses,
                                epsilon=0.0, seed=0)
     ib = InfraBayesianAgent(num_actions=n, hypotheses=hypotheses,
-                            prior=np.array([1.0]), epsilon=0.0, seed=0)
+                            prior=np.array([1.0]), seed=0)
     db.reset()
     ib.reset()
 
@@ -180,7 +180,6 @@ def test_bayesian_ucb_rejects_non_component_mixture_world_model():
         prior=np.array([1.0]),
         reward_function=np.tile(REWARD, (NUM_ARMS, 1)),
         exploration_strategy=BayesianUCB(),
-        epsilon=0.0,
     )
     agent.reset()
 
@@ -203,7 +202,6 @@ def test_thompson_sampling_rejects_non_component_mixture_world_model():
         prior=np.array([1.0]),
         reward_function=np.tile(REWARD, (NUM_ARMS, 1)),
         exploration_strategy=HypothesisThompsonSampling(),
-        epsilon=0.0,
     )
     agent.reset()
 
