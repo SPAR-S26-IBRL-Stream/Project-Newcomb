@@ -22,6 +22,25 @@ The script checks that a single-a-measure infra-Bayesian agent reproduces the
 classical Bayesian posterior-predictive bandit agent, then writes a compact
 figure comparing cumulative empirical regret and action probabilities.
 
+This directory also contains the Knightian-uncertainty worst-case robustness
+figure data. Run:
+
+```bash
+uv run python -m experiments.fllor2.ku_demo
+```
+
+This writes:
+
+```text
+experiments/fllor2/ku_demo_outputs/ku_regret_data.tex
+experiments/fllor2/ku_demo_outputs/ku_regret_preview.png
+```
+
+`ku_regret_data.tex` is the PGFPlots table used by the LaTeX figure.
+`ku_regret_preview.png` is a local rendering for quick inspection. The notebook
+`ku_demo.ipynb` contains the original exploratory simulation, while
+`ku_demo.py` is the stable reproduction entrypoint for the exact plotted data.
+
 ## Architecture Notes
 
 This is an explanation of the updated IB agent architecture.
