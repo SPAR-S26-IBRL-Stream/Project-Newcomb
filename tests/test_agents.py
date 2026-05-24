@@ -44,24 +44,27 @@ class TestQLearningAgent:
         agent.update(probs, 0, outcome)
         assert agent.counts[0] == 1
 
-    def test_epsilon_argument_creates_strategy(self, num_actions, seed):
-        agent = QLearningAgent(num_actions=num_actions, epsilon=0.2, seed=seed)
+    def test_epsilon_strategy_owns_epsilon(self, num_actions, seed):
+        agent = QLearningAgent(
+            num_actions=num_actions,
+            exploration_strategy=EpsilonGreedy(0.2),
+            seed=seed,
+        )
         assert isinstance(agent.exploration_strategy, EpsilonGreedy)
-        assert agent.epsilon == 0.2
+        assert agent.exploration_strategy.epsilon == 0.2
 
-    def test_temperature_argument_creates_strategy(self, num_actions, seed):
-        agent = QLearningAgent(num_actions=num_actions, temperature=1.0, seed=seed)
+    def test_softmax_strategy_owns_temperature(self, num_actions, seed):
+        agent = QLearningAgent(
+            num_actions=num_actions,
+            exploration_strategy=Softmax(1.0),
+            seed=seed,
+        )
         assert isinstance(agent.exploration_strategy, Softmax)
-        assert agent.temperature == 1.0
+        assert agent.exploration_strategy.temperature == 1.0
 
-    def test_explicit_strategy_rejects_legacy_arguments(self, num_actions, seed):
-        with pytest.raises(RuntimeError, match="exploration_strategy"):
-            QLearningAgent(
-                num_actions=num_actions,
-                exploration_strategy=Greedy(),
-                epsilon=0.0,
-                seed=seed,
-            )
+    def test_base_greedy_rejects_legacy_epsilon_argument(self, num_actions, seed):
+        with pytest.raises(TypeError):
+            QLearningAgent(num_actions=num_actions, epsilon=0.0, seed=seed)
 
 
 class TestBayesianAgent:

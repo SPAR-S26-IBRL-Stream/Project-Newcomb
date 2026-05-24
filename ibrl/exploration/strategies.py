@@ -28,7 +28,7 @@ class EpsilonGreedy(ExplorationStrategy):
 
     def get_probabilities(self, agent, values: np.ndarray) -> np.ndarray:
         greedy = Greedy().get_probabilities(agent, values)
-        eps = _scheduled_value(self.epsilon, agent.step, self.decay_type)
+        eps = scheduled_value(self.epsilon, agent.step, self.decay_type)
         uniform = np.ones(agent.num_actions) / agent.num_actions
         return (1 - eps) * greedy + eps * uniform
 
@@ -41,12 +41,12 @@ class Softmax(ExplorationStrategy):
         self.decay_type = int(decay_type)
 
     def get_probabilities(self, agent, values: np.ndarray) -> np.ndarray:
-        temperature = _scheduled_value(self.temperature, agent.step, self.decay_type)
+        temperature = scheduled_value(self.temperature, agent.step, self.decay_type)
         exp = np.exp((values - values.max()) / temperature)
         return exp / exp.sum()
 
 
-def _scheduled_value(parameter: float | tuple[float, float, float], step: int, decay_type: int) -> float:
+def scheduled_value(parameter: float | tuple[float, float, float], step: int, decay_type: int) -> float:
     if isinstance(parameter, float):
         return parameter
     if decay_type == 0:

@@ -5,6 +5,7 @@ import pytest
 from ibrl.infrabayesian.a_measure import AMeasure
 from ibrl.infrabayesian.infradistribution import Infradistribution
 from ibrl.infrabayesian import MultiBernoulliWorldModel
+from ibrl.exploration import EpsilonGreedy
 from ibrl.outcome import Outcome
 
 NUM_ARMS = 1
@@ -139,8 +140,12 @@ def test_bernoulli_grid_equivalent_to_discrete_bayesian():
     params = wm.make_params([grid] * n)
     hypotheses = [Infradistribution([AMeasure(params)], world_model=wm)]
 
-    db = DiscreteBayesianAgent(num_actions=n, num_hypotheses=num_hypotheses,
-                               epsilon=0.0, seed=0)
+    db = DiscreteBayesianAgent(
+        num_actions=n,
+        num_hypotheses=num_hypotheses,
+        exploration_strategy=EpsilonGreedy(0.0),
+        seed=0,
+    )
     ib = InfraBayesianAgent(num_actions=n, hypotheses=hypotheses,
                             prior=np.array([1.0]), seed=0)
     db.reset()

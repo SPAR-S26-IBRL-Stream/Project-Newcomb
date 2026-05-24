@@ -9,6 +9,7 @@ from .strategies import (
     Softmax,
     ThompsonSampling,
     UniformPrefixThen,
+    scheduled_value,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "Softmax",
     "ThompsonSampling",
     "UniformPrefixThen",
+    "scheduled_value",
 ]

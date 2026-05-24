@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 
 from ibrl.agents import InfraBayesianAgent
 from ibrl.environments.newcomb import NewcombEnvironment as NewcombEnv
+from ibrl.exploration import EpsilonGreedy
 from ibrl.infrabayesian.beliefs import NewcombLikeBelief
 from ibrl.simulators import simulate
 
@@ -38,7 +39,7 @@ def main() -> None:
     agent = InfraBayesianAgent(
         num_actions=options["num_actions"],
         beliefs=[NewcombLikeBelief(num_actions=options["num_actions"])],
-        epsilon=0.1,
+        exploration_strategy=EpsilonGreedy(0.1),
         seed=options["seed"] + 0x01234567,
         verbose=options["verbose"],
     )
