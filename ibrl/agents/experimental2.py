@@ -1,7 +1,8 @@
 import numpy as np
 
 from . import BaseGreedyAgent
-from ..exploration import Greedy, scheduled_value
+from ..exploration import Greedy
+from ..exploration.strategies import scheduled_value
 from ..utils import dump_array
 
 
