@@ -557,24 +557,67 @@ def run_and_save(
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--num-worlds", type=int, default=200)
-    parser.add_argument("--num-steps", type=int, default=100)
-    parser.add_argument("--seed", type=int, default=123)
-    parser.add_argument("--p-cat", type=float, default=0.01)
-    parser.add_argument("--p-low", type=float, default=0.3)
-    parser.add_argument("--p-high", type=float, default=0.7)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Regenerate the trap-bandit paper figures and summary table. "
+            "Defaults match the checked-in report outputs."
+        )
+    )
+    parser.add_argument(
+        "--num-worlds",
+        type=int,
+        default=200,
+        help="worlds sampled per report condition",
+    )
+    parser.add_argument(
+        "--num-steps",
+        type=int,
+        default=100,
+        help="interaction steps per sampled world",
+    )
+    parser.add_argument("--seed", type=int, default=123, help="base random seed")
+    parser.add_argument(
+        "--p-cat",
+        type=float,
+        default=0.01,
+        help="catastrophe probability for the trapped arm",
+    )
+    parser.add_argument(
+        "--p-low",
+        type=float,
+        default=0.3,
+        help="lower arm reward probability",
+    )
+    parser.add_argument(
+        "--p-high",
+        type=float,
+        default=0.7,
+        help="higher arm reward probability",
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("experiments/alaro/trap_bandit/results_report_200_pcat001"),
+        help="directory for generated figures, summaries, and config",
     )
-    parser.add_argument("--bootstrap-samples", type=int, default=5000)
-    parser.add_argument("--bootstrap-seed", type=int, default=0)
+    parser.add_argument(
+        "--bootstrap-samples",
+        type=int,
+        default=5000,
+        help="bootstrap resamples for results_table.md; use 0 to skip",
+    )
+    parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        default=0,
+        help="random seed for bootstrap confidence intervals",
+    )
     parser.add_argument(
         "--kinds",
         nargs="*",
         default=DEFAULT_KINDS,
+        choices=DEFAULT_KINDS,
+        help="agent kinds to run",
     )
     return parser.parse_args()
 
@@ -600,3 +643,4 @@ if __name__ == "__main__":
         print(condition)
         for kind, values in summary.items():
             print(kind, values["catastrophe_rate"], values["regret_p5_p50_p95"][:, -1])
+    print(f"Wrote trap-bandit outputs to {args.output_dir}")

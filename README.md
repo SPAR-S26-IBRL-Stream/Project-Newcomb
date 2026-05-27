@@ -43,6 +43,10 @@ Anyone can contribute new agents and environments! To do so, please:
 
 **experiments/** is the exploration zone. Create a folder with your git handle. Each experiment gets its own subfolder with a README covering: what and why, design decisions, chat logs if vibe coded, results and interpretation, ideas for shared architecture evolution. PRs here get lighter review.
 
+For reproduction instructions for **Infra-Bayesian Reinforcement Learning Agents
+Outperform Classical RL For Worst-Case Robustness**, start with
+[experiments/README.md](experiments/README.md).
+
 Some example work flows you can copy for your experiments:
 - Using a main.py file in experiments/fllor/main.py
 - Using a jupyter notebook in experiments/alaro/example.ipynb
@@ -154,4 +158,3 @@ uv run pytest --cov=ibrl --cov-report=term-missing
 ```
 
 or just push a commit and check github https://github.com/SPAR-S26-IBRL-Stream/Project-Newcomb/actions in a minute
-

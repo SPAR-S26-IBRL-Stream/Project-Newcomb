@@ -1,5 +1,67 @@
 # IB agent architecture proposal
 
+## Reproduction for Infra-Bayesian Reinforcement Learning Agents Outperform Classical RL For Worst-Case Robustness
+
+This directory contains the classical-equivalence validation figure for
+**Infra-Bayesian Reinforcement Learning Agents Outperform Classical RL For
+Worst-Case Robustness**.
+
+Run from the repository root:
+
+```bash
+uv run python -m experiments.fllor2.validate_classical
+```
+
+This regenerates:
+
+```text
+experiments/fllor2/validate_classical.png
+```
+
+The script checks that a single-a-measure infra-Bayesian agent reproduces the
+classical Bayesian posterior-predictive bandit agent, then writes a compact
+figure comparing cumulative empirical regret and action probabilities.
+
+This directory also contains the Knightian-uncertainty worst-case robustness
+figure data. Run:
+
+```bash
+uv run python -m experiments.fllor2.ku_demo
+```
+
+This writes:
+
+```text
+experiments/fllor2/ku_demo_outputs/ku_regret_data.tex
+experiments/fllor2/ku_demo_outputs/ku_regret_preview.png
+```
+
+`ku_regret_data.tex` is the PGFPlots table used by the LaTeX figure.
+`ku_regret_preview.png` is a local rendering for quick inspection. The notebook
+`ku_demo.ipynb` contains the original exploratory simulation, while
+`ku_demo.py` is the stable reproduction entrypoint for the exact plotted data.
+
+This directory also contains the Newcomb predictor-accuracy figure data. Run:
+
+```bash
+uv run python -m experiments.fllor2.newcomb_accuracy
+```
+
+This writes:
+
+```text
+experiments/fllor2/newcomb_accuracy_outputs/newcomb_accuracy_data.tex
+experiments/fllor2/newcomb_accuracy_outputs/newcomb_accuracy_preview.png
+```
+
+`newcomb_accuracy_data.tex` is the PGFPlots table used by the LaTeX figure.
+`newcomb_accuracy_preview.png` is a local rendering for quick inspection. The
+notebook `newcomb.ipynb` contains the original exploratory simulation, while
+`newcomb_accuracy.py` is the stable reproduction entrypoint for the exact
+plotted data.
+
+## Architecture Notes
+
 This is an explanation of the updated IB agent architecture.
 
 ## Motivation
