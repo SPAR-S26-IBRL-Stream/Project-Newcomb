@@ -6,6 +6,7 @@ from .strategies import (
     ExplorationStrategy,
     Greedy,
     HypothesisThompsonSampling,
+    Softmax,
     ThompsonSampling,
     UniformPrefixThen,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "ExplorationStrategy",
     "Greedy",
     "HypothesisThompsonSampling",
+    "Softmax",
     "ThompsonSampling",
     "UniformPrefixThen",
 ]

@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from ibrl.agents import QLearningAgent, BayesianAgent, EXP3Agent
 from ibrl.outcome import Outcome
 

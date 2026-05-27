@@ -76,3 +76,15 @@ class WorldModel(ABC):
         Returns a scalar.
         """
         pass
+
+    def get_posterior_component_weights(self, belief_state, params) -> np.ndarray:
+        """Posterior weights for finite component-mixture exploration strategies."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose posterior component weights"
+        )
+
+    def get_component_expected_rewards(self, component, reward_function: np.ndarray) -> np.ndarray:
+        """Per-action expected rewards for one finite posterior component."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose component expected rewards"
+        )

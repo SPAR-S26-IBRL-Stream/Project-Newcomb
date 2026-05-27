@@ -148,7 +148,6 @@ def test_newcomb_agent_policy_maximizes_discretized_table_value(
     dist = Infradistribution([AMeasure(wm.make_params(accuracy))], wm)
     agent = InfraBayesianAgent(
         num_actions=2,
-        epsilon=0.,
         hypotheses=[dist],
         reward_function=wm.agent_reward_matrix(),
         policy_discretisation=5,

@@ -1,6 +1,8 @@
 import numpy as np
 
 from . import BaseGreedyAgent
+from ..exploration import Greedy
+from ..exploration.strategies import scheduled_value
 from ..utils import dump_array
 
 
@@ -23,16 +25,22 @@ class ExperimentalAgent2(BaseGreedyAgent):
     """
     def __init__(self, *,
             learning_rate : float | None = None,
+            epsilon : float | tuple[float, float, float] = 0.1,
+            decay_type : int = 0,
             **kwargs):
         assert "temperature" not in kwargs or kwargs["temperature"] is None
-        super().__init__(**kwargs)
+        assert "exploration_strategy" not in kwargs or kwargs["exploration_strategy"] is None
+        super().__init__(exploration_strategy=Greedy(), **kwargs)
         assert self.num_actions == 2  # technical limitation for now
         self.learning_rate = None if (isinstance(learning_rate,float) and learning_rate < 0) else learning_rate
+        self.epsilon = epsilon
+        self.decay_type = int(decay_type)
+        assert self.decay_type in [0,1]
         self.update_threshold = 0.9 # minimum probability to be considered for update
         self.exploration_peak = 20  # how strongly peaked should exploration policies be
 
     def get_probabilities(self) -> np.ndarray:
-        epsilon = self.parse_parameter(self.epsilon)
+        epsilon = scheduled_value(self.epsilon, self.step, self.decay_type)
 
         if self.random.binomial(1, epsilon):
             # exploration: pick a strongly peaked distribution (with random peak)

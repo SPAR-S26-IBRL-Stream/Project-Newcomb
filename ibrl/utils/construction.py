@@ -1,5 +1,6 @@
 from .. import agents
 from .. import environments
+from ..exploration import EpsilonGreedy, Softmax
 
 
 def parse_argument_string(string : str) -> tuple[str, dict[str, float]]:
@@ -74,12 +75,29 @@ def construct_agent(string : str, options : dict[str,int], seed_offset : int = 0
     arguments.pop("num_steps", None)  # These should not be accessible to the agent
     arguments.pop("num_runs", None)
     arguments["seed"] += seed_offset
+    if name != "experimental2":
+        arguments = _convert_exploration_arguments(arguments)
 
     # TODO: specify and parse world model and hypothesis for IB agent
     if name == "infrabayesian":
         raise RuntimeError("Automatic initialisation of IB agent not yet supported")
 
     return agent_types[name](**arguments)
+
+
+def _convert_exploration_arguments(arguments: dict) -> dict:
+    epsilon = arguments.pop("epsilon", None)
+    temperature = arguments.pop("temperature", None)
+    decay_type = int(arguments.pop("decay_type", 0))
+    if epsilon is not None and temperature is not None:
+        raise RuntimeError("Cannot specify both epsilon and temperature")
+    if "exploration_strategy" in arguments and (epsilon is not None or temperature is not None):
+        raise RuntimeError("Cannot specify exploration_strategy with epsilon or temperature")
+    if epsilon is not None:
+        arguments["exploration_strategy"] = EpsilonGreedy(epsilon, decay_type)
+    elif temperature is not None:
+        arguments["exploration_strategy"] = Softmax(temperature, decay_type)
+    return arguments
 
 
 def construct_environment(string : str, options : dict[str,int], seed_offset : int = 0x89abcdef) -> environments.BaseEnvironment:
