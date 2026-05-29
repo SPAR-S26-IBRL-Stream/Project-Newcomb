@@ -1,4 +1,5 @@
 import pytest
+from ibrl.exploration import EpsilonGreedy
 from ibrl.utils.construction import parse_argument_string, construct_agent, construct_environment
 
 
@@ -38,7 +39,8 @@ class TestConstructAgent:
     def test_construct_with_arguments(self):
         options = {"num_actions": 2, "seed": 42, "verbose": 0}
         agent = construct_agent("classical:epsilon=0.2", options)
-        assert agent.epsilon == 0.2
+        assert isinstance(agent.exploration_strategy, EpsilonGreedy)
+        assert agent.exploration_strategy.epsilon == 0.2
 
     def test_invalid_agent_type(self):
         options = {"num_actions": 2, "seed": 42, "verbose": 0}

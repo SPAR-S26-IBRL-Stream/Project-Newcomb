@@ -1,7 +1,7 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from . import BaseEnvironment
+from ..outcome import Outcome
 
 
 class SwitchingAdversaryEnvironment(BaseEnvironment):
@@ -9,17 +9,17 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
     Classical bandit, where only one arm leads to a non-zero reward
     After a fixed number of interactions, the reward moves to a different arm
     """
-    def __init__(self, *args,
+    def __init__(self, *,
             switch_at : int = None,
             **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         if switch_at is None:
             if self.num_steps is None:
                 raise RuntimeError("SwitchingAdversaryEnvironment: require either switch_at or num_steps argument")
             switch_at = self.num_steps // 2
         self.switch_at = switch_at
 
-    def _resolve(self, env_action : int | None, action : int) -> float:
+    def step(self, probabilities : np.ndarray, action : int) -> Outcome:
         self._step_count += 1
 
         # At switch_at, the 'best' arm moves to the other side
@@ -27,7 +27,7 @@ class SwitchingAdversaryEnvironment(BaseEnvironment):
             self.values = np.zeros((self.num_actions,))
             self.values[-1] = 1.0 # Move reward to the last arm
 
-        return self.random.normal(self.values[action], 0.1)
+        return Outcome(reward=self.random.normal(self.values[action], 0.1))
 
     def get_optimal_reward(self) -> float:
         return 1.0 # The maximum reward is always 1.0
