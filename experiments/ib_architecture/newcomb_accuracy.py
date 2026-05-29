@@ -37,7 +37,6 @@ def make_agent(env: NewcombEnvironment, *, predictor_accuracy: float, seed: int)
     hypothesis = Infradistribution([AMeasure(wm.make_params(predictor_accuracy))], wm)
     return InfraBayesianAgent(
         num_actions=2,
-        epsilon=0.0,
         hypotheses=[hypothesis],
         reward_function=wm.agent_reward_matrix(),
         policy_discretisation=5,
