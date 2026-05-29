@@ -15,6 +15,7 @@ import numpy as np
 
 from ibrl.agents import DiscreteBayesianAgent, InfraBayesianAgent
 from ibrl.environments import BernoulliBanditEnvironment
+from ibrl.exploration import Greedy
 from ibrl.infrabayesian import AMeasure, Infradistribution, MultiBernoulliWorldModel
 from ibrl.simulators import simulate
 
@@ -53,7 +54,7 @@ def classical_agent(agent_probs: tuple[float, float]) -> FixedBeliefBayesianAgen
         p1=agent_probs[0],
         p2=agent_probs[1],
         num_actions=2,
-        epsilon=0.0,
+        exploration_strategy=Greedy(),
     )
 
 
@@ -68,7 +69,6 @@ def ib_agent() -> InfraBayesianAgent:
     ]
     return InfraBayesianAgent(
         num_actions=2,
-        epsilon=0.0,
         hypotheses=[Infradistribution(measures, wm)],
     )
 
