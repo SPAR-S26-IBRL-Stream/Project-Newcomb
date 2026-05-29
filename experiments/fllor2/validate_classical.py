@@ -33,11 +33,10 @@ def make_classical_ib_agent(
     grid = [np.array([1.0 - p, p]) for p in np.linspace(0.0, 1.0, num_hypotheses)]
     params = wm.make_params([grid] * num_actions)
     hypothesis = Infradistribution([AMeasure(params)], world_model=wm)
-    epsilon = kwargs.pop("epsilon", 0.1)
+    kwargs.setdefault("exploration_strategy", EpsilonGreedy(0.1))
     return InfraBayesianAgent(
         num_actions=num_actions,
         hypotheses=[hypothesis],
-        exploration_strategy=EpsilonGreedy(epsilon),
         **kwargs,
     )
 
@@ -54,7 +53,6 @@ def run_validation() -> dict[str, dict[str, dict]]:
         "num_actions": 2,
         "seed": options["seed"] + 0x01234567,
         "verbose": options["verbose"],
-        "epsilon": 0.1,
     }
     envs = {
         r"$p=(0.49,0.51)$": BernoulliBanditEnvironment(probs=[0.49, 0.51], **options),
@@ -66,8 +64,16 @@ def run_validation() -> dict[str, dict[str, dict]]:
     results: dict[str, dict[str, dict]] = {}
     for env_name, env in envs.items():
         agents = {
-            "Bayesian": DiscreteBayesianAgent(**shared, num_hypotheses=5),
-            "Infra-Bayesian": make_classical_ib_agent(**shared, num_hypotheses=5),
+            "Bayesian": DiscreteBayesianAgent(
+                **shared,
+                num_hypotheses=5,
+                exploration_strategy=EpsilonGreedy(0.1),
+            ),
+            "Infra-Bayesian": make_classical_ib_agent(
+                **shared,
+                num_hypotheses=5,
+                exploration_strategy=EpsilonGreedy(0.1),
+            ),
         }
         results[env_name] = {
             agent_name: simulate(env, agent, options, 0x01234567, 0x89ABCDEF)
