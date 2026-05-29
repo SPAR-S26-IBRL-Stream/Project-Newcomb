@@ -5,7 +5,7 @@ used in **Infra-Bayesian Reinforcement Learning Agents Outperform Classical RL
 For Worst-Case Robustness**. The checked-in output directory is:
 
 ```text
-experiments/alaro/trap_bandit/results_report_200_pcat001/
+experiments/trap_bandit/results_report_200_pcat001/
 ```
 
 ## Reproduce Outputs for Infra-Bayesian Reinforcement Learning Agents Outperform Classical RL For Worst-Case Robustness
@@ -13,7 +13,7 @@ experiments/alaro/trap_bandit/results_report_200_pcat001/
 Run from the repository root:
 
 ```bash
-uv run python -m experiments.alaro.trap_bandit.run
+uv run python -m experiments.trap_bandit.run
 ```
 
 The defaults are the settings used for
@@ -27,7 +27,7 @@ p_cat = 0.01
 p_low = 0.3
 p_high = 0.7
 bootstrap_samples = 5000
-output_dir = experiments/alaro/trap_bandit/results_report_200_pcat001
+output_dir = experiments/trap_bandit/results_report_200_pcat001
 ```
 
 The script writes:
@@ -50,7 +50,7 @@ and the summary table text.
 For a quick end-to-end check without regenerating the full reproduction outputs:
 
 ```bash
-uv run python -m experiments.alaro.trap_bandit.run \
+uv run python -m experiments.trap_bandit.run \
   --num-worlds 2 \
   --num-steps 10 \
   --bootstrap-samples 0 \

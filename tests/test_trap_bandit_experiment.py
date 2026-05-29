@@ -9,7 +9,7 @@ from ibrl.infrabayesian.builders.trap_bandit import (
     make_ib_hypothesis,
     make_trap_bandit_hypotheses,
 )
-from experiments.alaro.trap_bandit.run import (
+from experiments.trap_bandit.run import (
     REPORT_FIGURES,
     REWARD_FUNCTION,
     TrapBanditConfig,

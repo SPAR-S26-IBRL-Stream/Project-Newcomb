@@ -27,14 +27,14 @@ We compare classical Bayesian agents and an infra-Bayesian agent using the same 
 
 ```
 Our results can be reproduced by running:
-uv run python -m experiments.alaro.trap_bandit.run \
+uv run python -m experiments.trap_bandit.run \
 --num-worlds 200 \
 --num-steps 100 \
 --p-cat 0.01 \
 --p-low 0.3 \
 --p-high 0.7 \
 --bootstrap-samples 5000 \
---output-dir experiments/alaro/trap_bandit/results_report_200_pcat001
+--output-dir experiments/trap_bandit/results_report_200_pcat001
 ```
 
 We consider three data generating processes: a mostly risky worlds setting, in which the data-generating process has `p_risky=0.99`; a mostly safe worlds setting, in which the data-generating process has `p_risky=0.01`; and a balanced risky/safe worlds setting, in which the data-generating process has `p_risky=0.5`. For each data generating process, we compare Bayesian agents with correctly specified point priors, Bayesian agents with misspecified point priors, and infra-Bayesian learners, which do not specify a prior probability but instead maintain Knightian uncertainty over whether they are in a risky or safe world. The infra-Bayesian agent always shares the same classical `p1,p2` prior as the Bayesian agent but maintains Knightian uncertainty over whether the world is safe or risky.
